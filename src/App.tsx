@@ -170,16 +170,53 @@ function App() {
     return (
       <div className="hc-card">
         {venue?.logo_url ? (
-          <img
-            src={venue.logo_url}
-            alt={venue.name}
-            className="hc-venue-logo"
-          />
+          <div
+            style={{
+              width: '80px',
+              height: '80px',
+              borderRadius: '16px',
+              background: '#1a2535',
+              border: '1px solid #1e2d3d',
+              margin: '0 auto 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '8px',
+            }}
+          >
+            <img
+              src={venue.logo_url}
+              alt={venue.name}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+              }}
+            />
+          </div>
         ) : (
-          <h1 className="hc-venue-name">{venue?.name}</h1>
+          <>
+            <div
+              style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '16px',
+                background: '#22d3ee',
+                margin: '0 auto 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '32px',
+                fontWeight: '800',
+                color: 'white',
+              }}
+            >
+              {venue?.name?.charAt(0).toUpperCase()}
+            </div>
+            <h1 className="hc-venue-name">{venue?.name}</h1>
+          </>
         )}
 
-        {venue?.logo_url && <h1 className="hc-venue-name">{venue?.name}</h1>}
         <div className="hc-table-label">Table {asset?.label}</div>
 
         <button
