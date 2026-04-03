@@ -181,14 +181,11 @@ function App() {
     return (
       <div style={styles.container}>
         <div style={styles.card}>
-          <div style={styles.logoContainer}>
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-              <path
-                d="M24 4C19 4 15 8 15 13C15 18 19 22 24 22C24 22 24 35 24 44C24 35 24 22 24 22C29 22 33 18 33 13C33 8 29 4 24 4Z"
-                fill="#22d3ee"
-              />
-            </svg>
-          </div>
+          <svg viewBox="0 0 72.71 90.04" width="48" height="60" style={{margin: '0 auto 16px', display: 'block'}}>
+            <path fill="#1db1d1" d="M36.36,0C16.28,0,.6,16.3.01,36.36c-.64,21.77,29.31,48.22,35.31,53.29.61.52,1.48.52,2.08,0,5.96-4.98,35.31-30.65,35.31-53.31C72.71,16.27,56.43,0,36.36,0z"/>
+            <path fill="#fff" d="M25.11,17.28c0-1.61,1.3-2.91,2.91-2.91s2.91,1.3,2.91,2.91v12.86h13.77c1.61,0,2.91,1.3,2.91,2.91v14.3c0,1.6-1.3,2.91-2.91,2.91s-2.91-1.31-2.91-2.91v-11.4h-10.86v11.98c0,1.6-1.31,2.91-2.91,2.91s-2.91-1.31-2.91-2.91v-30.65z"/>
+            <path fill="#fff" d="M56.41,54.42c-3.84,7.64-11.53,12.39-20.07,12.39s-16.31-4.87-20.07-12.4c-.71-1.44-.12-3.18,1.31-3.9,1.44-.71,3.18-.12,3.9,1.31,2.77,5.57,8.61,9.18,14.86,9.18s12.02-3.52,14.87-9.19c.73-1.43,2.47-2.01,3.9-1.28,1.44.71,2.02,2.47,1.3,3.9z"/>
+          </svg>
 
           <h1 style={styles.venueName}>{venue?.name}</h1>
           <div style={styles.tableLabel}>Table {asset?.label}</div>
@@ -198,24 +195,28 @@ function App() {
               style={styles.serviceButton}
               onClick={() => handleServiceRequest('check_please')}
             >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
               Check Please
             </button>
             <button
               style={styles.serviceButton}
               onClick={() => handleServiceRequest('water')}
             >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
               Water Refill
             </button>
             <button
               style={styles.serviceButton}
               onClick={() => handleServiceRequest('waiter')}
             >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               Waiter Needed
             </button>
             <button
               style={styles.serviceButton}
               onClick={() => handleServiceRequest('clear')}
             >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
               Clear Table
             </button>
           </div>
@@ -224,6 +225,7 @@ function App() {
             style={styles.allergenButton}
             onClick={() => handleServiceRequest('allergen')}
           >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             Allergen Alert
           </button>
 
@@ -231,29 +233,31 @@ function App() {
             style={styles.emergencyButton}
             onClick={() => handleServiceRequest('critical')}
           >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             Emergency
           </button>
 
           {submitError && <div style={styles.errorText}>{submitError}</div>}
 
+          <div style={styles.sentimentLabel}>How was your experience?</div>
           <div style={styles.sentimentContainer}>
             <button
               style={{ ...styles.sentimentButton, ...styles.sentimentGreen }}
               onClick={() => handleSentimentClick(3)}
             >
-              😊
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
             </button>
             <button
               style={{ ...styles.sentimentButton, ...styles.sentimentAmber }}
               onClick={() => handleSentimentClick(2)}
             >
-              😐
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 15h8"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
             </button>
             <button
               style={{ ...styles.sentimentButton, ...styles.sentimentRed }}
               onClick={() => handleSentimentClick(1)}
             >
-              😞
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
             </button>
           </div>
         </div>
@@ -353,7 +357,7 @@ function App() {
 
     const sentimentContent = {
       3: {
-        message: "Glad you're enjoying it! 🎉",
+        message: "Glad you're enjoying it!",
         showReview: !!venue?.google_review_url,
       },
       2: {
@@ -428,8 +432,9 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     maxWidth: '420px',
     backgroundColor: '#141d2b',
-    borderRadius: '12px',
-    padding: '24px',
+    border: '1px solid #1e2d3d',
+    borderRadius: '16px',
+    padding: '28px 20px',
     color: '#e2e8f0',
   },
   logoContainer: {
@@ -438,74 +443,92 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '16px',
   },
   venueName: {
-    fontSize: '24px',
-    fontWeight: '600',
+    fontSize: '22px',
+    fontWeight: '700',
     textAlign: 'center',
-    margin: '0 0 8px 0',
+    margin: '0 0 4px 0',
     color: '#e2e8f0',
   },
   tableLabel: {
-    fontSize: '16px',
+    fontSize: '14px',
     textAlign: 'center',
     color: '#94a3b8',
-    marginBottom: '32px',
+    marginBottom: '24px',
   },
   buttonGroup: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
-    marginBottom: '16px',
+    gap: '10px',
+    marginBottom: '10px',
   },
   serviceButton: {
     width: '100%',
-    minHeight: '52px',
+    height: '56px',
     backgroundColor: '#22d3ee',
     color: '#0d1117',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '16px',
-    fontWeight: '600',
+    fontWeight: '700',
     cursor: 'pointer',
-    transition: 'background-color 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '0 20px',
   },
   allergenButton: {
     width: '100%',
-    minHeight: '52px',
+    height: '56px',
     backgroundColor: '#f59e0b',
     color: '#0d1117',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '16px',
-    fontWeight: '600',
+    fontWeight: '700',
     cursor: 'pointer',
-    marginBottom: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '0 20px',
+    marginBottom: '10px',
   },
   emergencyButton: {
     width: '100%',
-    minHeight: '52px',
+    height: '56px',
     backgroundColor: '#ef4444',
     color: '#ffffff',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '16px',
-    fontWeight: '600',
+    fontWeight: '700',
     cursor: 'pointer',
-    marginBottom: '32px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '0 20px',
+    marginBottom: '24px',
+  },
+  sentimentLabel: {
+    fontSize: '13px',
+    textAlign: 'center',
+    color: '#94a3b8',
+    marginBottom: '12px',
   },
   sentimentContainer: {
     display: 'flex',
     justifyContent: 'center',
     gap: '16px',
-    marginTop: '32px',
   },
   sentimentButton: {
     width: '64px',
     height: '64px',
     border: 'none',
     borderRadius: '50%',
-    fontSize: '32px',
     cursor: 'pointer',
-    transition: 'transform 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0',
   },
   sentimentGreen: {
     backgroundColor: '#10b981',
@@ -527,7 +550,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   screenTitle: {
     fontSize: '20px',
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: '24px',
     color: '#e2e8f0',
   },
@@ -539,9 +562,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   chip: {
     padding: '8px 16px',
-    backgroundColor: '#1f2937',
+    backgroundColor: '#141d2b',
     color: '#94a3b8',
-    border: '2px solid transparent',
+    border: '1px solid #1e2d3d',
     borderRadius: '20px',
     fontSize: '14px',
     cursor: 'pointer',
@@ -551,14 +574,14 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: '#22d3ee',
     color: '#0d1117',
     borderColor: '#22d3ee',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   severityContainer: {
     marginBottom: '24px',
   },
   severityLabel: {
     fontSize: '14px',
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: '12px',
     color: '#e2e8f0',
   },
@@ -583,10 +606,10 @@ const styles: Record<string, React.CSSProperties> = {
   textarea: {
     width: '100%',
     padding: '12px',
-    backgroundColor: '#1f2937',
+    backgroundColor: '#141d2b',
     color: '#e2e8f0',
-    border: '1px solid #374151',
-    borderRadius: '8px',
+    border: '1px solid #1e2d3d',
+    borderRadius: '10px',
     fontSize: '14px',
     fontFamily: 'inherit',
     resize: 'vertical',
@@ -594,23 +617,23 @@ const styles: Record<string, React.CSSProperties> = {
   },
   submitButton: {
     width: '100%',
-    minHeight: '52px',
+    height: '56px',
     backgroundColor: '#22d3ee',
     color: '#0d1117',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '16px',
-    fontWeight: '600',
+    fontWeight: '700',
     cursor: 'pointer',
   },
   submitButtonDisabled: {
-    backgroundColor: '#374151',
-    color: '#6b7280',
+    backgroundColor: '#1e2d3d',
+    color: '#94a3b8',
     cursor: 'not-allowed',
   },
   sentimentMessage: {
     fontSize: '20px',
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
     marginBottom: '24px',
     color: '#e2e8f0',
@@ -618,27 +641,27 @@ const styles: Record<string, React.CSSProperties> = {
   reviewButton: {
     display: 'block',
     width: '100%',
-    minHeight: '52px',
+    height: '56px',
     backgroundColor: '#22d3ee',
     color: '#0d1117',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '16px',
-    fontWeight: '600',
+    fontWeight: '700',
     textDecoration: 'none',
     textAlign: 'center',
-    lineHeight: '52px',
-    marginBottom: '12px',
+    lineHeight: '56px',
+    marginBottom: '10px',
   },
   doneButton: {
     width: '100%',
-    minHeight: '52px',
+    height: '56px',
     backgroundColor: '#10b981',
     color: '#ffffff',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '16px',
-    fontWeight: '600',
+    fontWeight: '700',
     cursor: 'pointer',
   },
   successIcon: {
@@ -649,7 +672,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   successTitle: {
     fontSize: '20px',
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
     marginBottom: '8px',
     color: '#e2e8f0',
