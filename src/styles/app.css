@@ -287,3 +287,8 @@ body {
   padding: 40px 20px;
   font-size: 14px;
 }
+
+@keyframes shimmer {
+  0%   { background-position: -200px 0 }
+  100% { background-position:  200px 0 }
+}

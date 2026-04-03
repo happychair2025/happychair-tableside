@@ -23,6 +23,7 @@ function App() {
   const [allergenSeverity, setAllergenSeverity] = useState<AllergenSeverity>('mild')
   const [allergenNotes, setAllergenNotes] = useState('')
   const [cooldowns, setCooldowns] = useState<Record<string, boolean>>({})
+  const [loading, setLoading] = useState(true)
 
   const venueId = new URLSearchParams(window.location.search).get('venue')
   const assetId = new URLSearchParams(window.location.search).get('table')
@@ -31,10 +32,12 @@ function App() {
     if (!venueId || !assetId) {
       setAppError('invalid_qr')
       setScreen('loading')
+      setLoading(false)
       return
     }
 
     async function loadData() {
+      setLoading(true)
       try {
         const [venueResult, assetResult] = await Promise.all([
           supabase.from('venues').select('*').eq('id', venueId).maybeSingle(),
@@ -44,22 +47,26 @@ function App() {
         if (venueResult.error || !venueResult.data) {
           setAppError('venue_not_found')
           setScreen('loading')
+          setLoading(false)
           return
         }
 
         if (assetResult.error || !assetResult.data) {
           setAppError('asset_not_found')
           setScreen('loading')
+          setLoading(false)
           return
         }
 
         setVenue(venueResult.data)
         setAsset(assetResult.data)
         setScreen('main')
+        setLoading(false)
       } catch (err) {
         console.error('Load error:', err)
         setErrorMessage('Something went wrong — please try again')
         setScreen('error')
+        setLoading(false)
       }
     }
 
@@ -303,6 +310,25 @@ function App() {
         <div style={{color:'#e2e8f0',fontSize:'18px',fontWeight:'700'}}>{msg.title}</div>
         <div style={{color:'#94a3b8',fontSize:'14px',lineHeight:'1.5'}}>{msg.body}</div>
         <div style={{color:'#7b8fa8',fontSize:'12px',marginTop:'8px'}}>If this keeps happening please ask your server for help.</div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div style={{background:'#141d2b',border:'1px solid #1e2d3d',borderRadius:'20px',padding:'22px 16px 20px',width:'100%',display:'flex',flexDirection:'column',gap:'10px'}}>
+        <div style={{width:'76px',height:'76px',borderRadius:'16px',background:'linear-gradient(90deg,#141d2b 0,#1a2535 40px,#141d2b 80px)',backgroundSize:'400px',animation:'shimmer 1.4s ease infinite',margin:'0 auto 6px'}} />
+        <div style={{width:'140px',height:'18px',borderRadius:'6px',background:'linear-gradient(90deg,#141d2b 0,#1a2535 40px,#141d2b 80px)',backgroundSize:'400px',animation:'shimmer 1.4s ease infinite',margin:'0 auto'}} />
+        <div style={{width:'100px',height:'12px',borderRadius:'4px',background:'linear-gradient(90deg,#141d2b 0,#1a2535 40px,#141d2b 80px)',backgroundSize:'400px',animation:'shimmer 1.4s ease infinite',margin:'0 auto 8px'}} />
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+          {[1,2,3,4].map(i => (
+            <div key={i} style={{height:'88px',borderRadius:'14px',background:'linear-gradient(90deg,#141d2b 0,#1a2535 40px,#141d2b 80px)',backgroundSize:'400px',animation:'shimmer 1.4s ease infinite'}} />
+          ))}
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+          <div style={{height:'48px',borderRadius:'12px',background:'linear-gradient(90deg,#141d2b 0,#1a2535 40px,#141d2b 80px)',backgroundSize:'400px',animation:'shimmer 1.4s ease infinite'}} />
+          <div style={{height:'48px',borderRadius:'12px',background:'linear-gradient(90deg,#141d2b 0,#1a2535 40px,#141d2b 80px)',backgroundSize:'400px',animation:'shimmer 1.4s ease infinite'}} />
+        </div>
       </div>
     )
   }
