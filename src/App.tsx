@@ -17,6 +17,7 @@ function App() {
   const [errorMessage, setErrorMessage] = useState('')
   const [sentimentScore, setSentimentScore] = useState<SentimentScore | null>(null)
   const [submitError, setSubmitError] = useState('')
+  const [appError, setAppError] = useState<string | null>(null)
 
   const [selectedAllergens, setSelectedAllergens] = useState<string[]>([])
   const [allergenSeverity, setAllergenSeverity] = useState<AllergenSeverity>('mild')
@@ -27,8 +28,8 @@ function App() {
 
   useEffect(() => {
     if (!venueId || !assetId) {
-      setErrorMessage('Invalid QR code — please scan again')
-      setScreen('error')
+      setAppError('invalid_qr')
+      setScreen('loading')
       return
     }
 
@@ -39,10 +40,16 @@ function App() {
           supabase.from('assets').select('*').eq('id', assetId).maybeSingle(),
         ])
 
-        if (venueResult.error) throw venueResult.error
-        if (assetResult.error) throw assetResult.error
-        if (!venueResult.data || !assetResult.data) {
-          throw new Error('Venue or table not found')
+        if (venueResult.error || !venueResult.data) {
+          setAppError('venue_not_found')
+          setScreen('loading')
+          return
+        }
+
+        if (assetResult.error || !assetResult.data) {
+          setAppError('asset_not_found')
+          setScreen('loading')
+          return
         }
 
         setVenue(venueResult.data)
@@ -169,6 +176,32 @@ function App() {
       prev.includes(allergen)
         ? prev.filter((a) => a !== allergen)
         : [...prev, allergen]
+    )
+  }
+
+  if (appError) {
+    const messages: Record<string, {title: string, body: string}> = {
+      invalid_qr: {
+        title: 'Invalid QR Code',
+        body: 'Please scan the QR code at your table again.'
+      },
+      venue_not_found: {
+        title: 'Venue Not Found',
+        body: 'We could not find this venue. Please alert your server.'
+      },
+      asset_not_found: {
+        title: 'Table Not Found',
+        body: 'Please scan the QR code at your table again or alert your server.'
+      }
+    }
+    const msg = messages[appError] || messages.invalid_qr
+    return (
+      <div style={{background:'#141d2b',border:'1px solid #1e2d3d',borderRadius:'20px',padding:'32px 20px',textAlign:'center',display:'flex',flexDirection:'column',alignItems:'center',gap:'12px',margin:'20px 16px'}}>
+        <div style={{fontSize:'32px'}}>⚠️</div>
+        <div style={{color:'#e2e8f0',fontSize:'18px',fontWeight:'700'}}>{msg.title}</div>
+        <div style={{color:'#94a3b8',fontSize:'14px',lineHeight:'1.5'}}>{msg.body}</div>
+        <div style={{color:'#7b8fa8',fontSize:'12px',marginTop:'8px'}}>If this keeps happening please ask your server for help.</div>
+      </div>
     )
   }
 
