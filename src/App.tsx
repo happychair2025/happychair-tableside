@@ -325,7 +325,7 @@ function App() {
             <div key={i} style={{height:'88px',borderRadius:'14px',background:'linear-gradient(90deg,#141d2b 0,#1a2535 40px,#141d2b 80px)',backgroundSize:'400px',animation:'shimmer 1.4s ease infinite'}} />
           ))}
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginTop:'0px'}}>
           <div style={{height:'48px',borderRadius:'12px',background:'linear-gradient(90deg,#141d2b 0,#1a2535 40px,#141d2b 80px)',backgroundSize:'400px',animation:'shimmer 1.4s ease infinite'}} />
           <div style={{height:'48px',borderRadius:'12px',background:'linear-gradient(90deg,#141d2b 0,#1a2535 40px,#141d2b 80px)',backgroundSize:'400px',animation:'shimmer 1.4s ease infinite'}} />
         </div>
