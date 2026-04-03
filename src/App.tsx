@@ -181,13 +181,17 @@ function App() {
     return (
       <div style={styles.container}>
         <div style={styles.card}>
-          <svg viewBox="0 0 72.71 90.04" width="48" height="60" style={{margin: '0 auto 16px', display: 'block'}}>
-            <path fill="#1db1d1" d="M36.36,0C16.28,0,.6,16.3.01,36.36c-.64,21.77,29.31,48.22,35.31,53.29.61.52,1.48.52,2.08,0,5.96-4.98,35.31-30.65,35.31-53.31C72.71,16.27,56.43,0,36.36,0z"/>
-            <path fill="#fff" d="M25.11,17.28c0-1.61,1.3-2.91,2.91-2.91s2.91,1.3,2.91,2.91v12.86h13.77c1.61,0,2.91,1.3,2.91,2.91v14.3c0,1.6-1.3,2.91-2.91,2.91s-2.91-1.31-2.91-2.91v-11.4h-10.86v11.98c0,1.6-1.31,2.91-2.91,2.91s-2.91-1.31-2.91-2.91v-30.65z"/>
-            <path fill="#fff" d="M56.41,54.42c-3.84,7.64-11.53,12.39-20.07,12.39s-16.31-4.87-20.07-12.4c-.71-1.44-.12-3.18,1.31-3.9,1.44-.71,3.18-.12,3.9,1.31,2.77,5.57,8.61,9.18,14.86,9.18s12.02-3.52,14.87-9.19c.73-1.43,2.47-2.01,3.9-1.28,1.44.71,2.02,2.47,1.3,3.9z"/>
-          </svg>
+          {venue?.logo_url ? (
+            <img
+              src={venue.logo_url}
+              alt={venue.name}
+              style={{height: '64px', objectFit: 'contain', marginBottom: '16px', display: 'block', margin: '0 auto 16px'}}
+            />
+          ) : (
+            <h1 style={styles.venueName}>{venue?.name}</h1>
+          )}
 
-          <h1 style={styles.venueName}>{venue?.name}</h1>
+          {venue?.logo_url && <h1 style={styles.venueName}>{venue?.name}</h1>}
           <div style={styles.tableLabel}>Table {asset?.label}</div>
 
           <div style={styles.buttonGroup}>
