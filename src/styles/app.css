@@ -316,15 +316,38 @@ body {
 
 @media (max-height: 700px) {
   .hc-btn {
-    height: 76px;
-    padding: 8px 6px;
-    gap: 6px;
+    height: 72px;
+    padding: 6px 16px;
+    gap: 8px;
   }
   .hc-face {
-    height: 56px;
-    gap: 4px;
+    width: 44px;
+    height: 44px;
   }
   .hc-card {
-    gap: 8px;
+    gap: 7px;
+    padding: 20px 18px;
+  }
+  .hc-venue-logo {
+    height: 52px;
+    margin-bottom: 12px;
+  }
+  .hc-venue-name {
+    font-size: 20px;
+    margin-bottom: 2px;
+  }
+  .hc-table-label {
+    font-size: 13px;
+    margin-bottom: 14px;
+  }
+  .hc-sentiment-label {
+    font-size: 11px;
+    margin-bottom: 6px;
+    padding-top: 10px;
+  }
+  .hc-sentiment-row {
+    gap: 16px;
+    margin-top: 4px;
+    padding-top: 12px;
   }
 }
