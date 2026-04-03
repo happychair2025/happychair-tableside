@@ -129,23 +129,16 @@ function App() {
     setTimeout(() => setScreen('main'), 3000)
   }
 
-  const handleSentimentClick = (score: SentimentScore) => {
+  const submitSentiment = async (score: SentimentScore) => {
+    if (!venueId || !assetId) return
     setSentimentScore(score)
     setScreen('sentiment')
-  }
-
-  const handleSentimentSubmit = async () => {
-    if (!venueId || !assetId || !sentimentScore) return
-
-    const googleReviewPrompted = sentimentScore === 3
-    const managerInterventionNeeded = sentimentScore === 1
-
     await supabase.from('sentiment_ratings').insert({
       venue_id: venueId,
       asset_id: assetId,
-      score: sentimentScore,
-      google_review_prompted: googleReviewPrompted,
-      manager_intervention_needed: managerInterventionNeeded,
+      score,
+      google_review_prompted: score === 3,
+      manager_intervention_needed: score === 1,
     })
   }
 
@@ -240,19 +233,19 @@ function App() {
         <div className="hc-sentiment-row">
           <button
             className="hc-face hc-face-positive"
-            onClick={() => handleSentimentClick(3)}
+            onClick={() => submitSentiment(3)}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
           </button>
           <button
             className="hc-face hc-face-neutral"
-            onClick={() => handleSentimentClick(2)}
+            onClick={() => submitSentiment(2)}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 15h8"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
           </button>
           <button
             className="hc-face hc-face-negative"
-            onClick={() => handleSentimentClick(1)}
+            onClick={() => submitSentiment(1)}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
           </button>
@@ -347,10 +340,9 @@ function App() {
     )
   }
 
-  if (screen === 'sentiment' && sentimentScore) {
-    useEffect(() => {
-      handleSentimentSubmit()
-    }, [])
+  if (screen === 'sentiment') {
+    const s = sentimentScore
+    if (s === null) return null
 
     const sentimentContent = {
       3: {
@@ -365,7 +357,7 @@ function App() {
         message: "We're sorry — a manager will be right with you shortly.",
         showReview: false,
       },
-    }[sentimentScore]
+    }[s]
 
     return (
       <div className="hc-card">
