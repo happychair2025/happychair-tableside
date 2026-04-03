@@ -133,13 +133,35 @@ function App() {
     if (!venueId || !assetId) return
     setSentimentScore(score)
     setScreen('sentiment')
-    await supabase.from('sentiment_ratings').insert({
-      venue_id: venueId,
-      asset_id: assetId,
-      score,
-      google_review_prompted: score === 3,
-      manager_intervention_needed: score === 1,
-    })
+
+    if (score === 3) {
+      await supabase.from('sentiment_ratings').insert({
+        venue_id: venueId,
+        asset_id: assetId,
+        score: 3,
+        google_review_prompted: true,
+        manager_intervention_needed: false,
+        notification_priority: null,
+      })
+    } else if (score === 2) {
+      await supabase.from('sentiment_ratings').insert({
+        venue_id: venueId,
+        asset_id: assetId,
+        score: 2,
+        google_review_prompted: false,
+        manager_intervention_needed: false,
+        notification_priority: 'normal',
+      })
+    } else if (score === 1) {
+      await supabase.from('sentiment_ratings').insert({
+        venue_id: venueId,
+        asset_id: assetId,
+        score: 1,
+        google_review_prompted: false,
+        manager_intervention_needed: true,
+        notification_priority: 'urgent',
+      })
+    }
   }
 
   const toggleAllergen = (allergen: string) => {
