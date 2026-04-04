@@ -353,104 +353,48 @@ function App() {
     return (
       <div className="hc-card">
         {venue?.logo_url ? (
-          <div
-            style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '16px',
-              background: '#1a2535',
-              border: '1px solid #1e2d3d',
-              margin: '0 auto 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '8px',
-            }}
-          >
-            <img
-              src={venue.logo_url}
-              alt={venue.name}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-              }}
-            />
+          <div style={{width:'80px',height:'80px',borderRadius:'16px',background:'#1a2535',border:'1px solid #1e2d3d',margin:'0 auto 4px',display:'flex',alignItems:'center',justifyContent:'center',padding:'8px'}}>
+            <img src={venue.logo_url} alt={venue.name} style={{width:'100%',height:'100%',objectFit:'contain'}} />
           </div>
         ) : (
-          <>
-            <div
-              style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '16px',
-                background: '#22d3ee',
-                margin: '0 auto 16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '32px',
-                fontWeight: '800',
-                color: 'white',
-              }}
-            >
-              {venue?.name?.charAt(0).toUpperCase()}
-            </div>
-            <h1 className="hc-venue-name">{venue?.name}</h1>
-          </>
+          <div style={{width:'76px',height:'76px',borderRadius:'16px',background:'linear-gradient(135deg,#22d3ee 0%,#0891b2 100%)',margin:'0 auto 4px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'30px',fontWeight:'800',color:'#0d1117',animation:'breathe 4s ease infinite'}}>
+            {venue?.name?.charAt(0).toUpperCase()}
+          </div>
         )}
 
+        <h1 className="hc-venue-name">{venue?.name}</h1>
         <div className="hc-table-label">Table {asset?.label}</div>
 
-        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px'}}>
-          <button
-            className="hc-btn hc-btn-primary"
-            onClick={handleRequestCheck}
-            style={isCoolingDown('check') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Request Check
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+          <button className="hc-btn hc-btn-primary" onClick={handleRequestCheck} style={isCoolingDown('check') ? {opacity:0.6,pointerEvents:'none'} : {}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>Request Check</span>
           </button>
-          <button
-            className="hc-btn hc-btn-primary"
-            onClick={handleRequestWater}
-            style={isCoolingDown('water') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
-            Refill Water
+          <button className="hc-btn hc-btn-primary" onClick={handleRequestWater} style={isCoolingDown('water') ? {opacity:0.6,pointerEvents:'none'} : {}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+            <span>Refill Water</span>
           </button>
-          <button
-            className="hc-btn hc-btn-primary"
-            onClick={handleRequestServer}
-            style={isCoolingDown('server') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            Call Server
+          <button className="hc-btn hc-btn-primary" onClick={handleRequestServer} style={isCoolingDown('server') ? {opacity:0.6,pointerEvents:'none'} : {}}>
+            <div className="bell-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </div>
+            <span>Call Server</span>
           </button>
-          <button
-            className="hc-btn hc-btn-primary"
-            onClick={handleRequestPlates}
-            style={isCoolingDown('plates') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
-            Clear Plates
+          <button className="hc-btn hc-btn-primary" onClick={handleRequestPlates} style={isCoolingDown('plates') ? {opacity:0.6,pointerEvents:'none'} : {}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
+            <span>Clear Plates</span>
           </button>
         </div>
 
-        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px'}}>
-          <button
-            className="hc-btn hc-btn-allergen"
-            onClick={() => handleServiceRequest('allergen')}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+          <button className="hc-btn hc-btn-allergen" onClick={() => handleServiceRequest('allergen')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             Food Allergies
           </button>
-
-          <button
-            className="hc-btn hc-btn-danger"
-            onClick={() => handleServiceRequest('critical')}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <button className="hc-btn hc-btn-danger" onClick={() => handleServiceRequest('critical')}>
+            <div className="hand-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+            </div>
             Get Help
           </button>
         </div>
@@ -459,26 +403,17 @@ function App() {
 
         <div className="hc-sentiment-label">How's everything?</div>
         <div className="hc-sentiment-row">
-          <button
-            className="hc-face hc-face-positive"
-            onClick={() => submitSentiment(3)}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-            <span style={{fontSize: '11px', marginTop: '4px', color: 'white'}}>I'm Happy</span>
+          <button className="hc-face hc-face-positive" onClick={() => submitSentiment(3)}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            <span className="fb-text">I'm Happy</span>
           </button>
-          <button
-            className="hc-face hc-face-neutral"
-            onClick={() => submitSentiment(2)}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 15h8"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-            <span style={{fontSize: '11px', marginTop: '4px', color: 'white'}}>It was okay</span>
+          <button className="hc-face hc-face-neutral" onClick={() => submitSentiment(2)}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="15" x2="16" y2="15"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            <span className="fb-text">It was okay</span>
           </button>
-          <button
-            className="hc-face hc-face-negative"
-            onClick={() => submitSentiment(1)}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-            <span style={{fontSize: '11px', marginTop: '4px', color: 'white'}}>Disappointed</span>
+          <button className="hc-face hc-face-negative" onClick={() => submitSentiment(1)}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            <span className="fb-text">Disappointed</span>
           </button>
         </div>
       </div>
@@ -486,29 +421,17 @@ function App() {
   }
 
   if (screen === 'allergen') {
-    const allergenOptions = [
-      'Gluten',
-      'Dairy',
-      'Eggs',
-      'Fish',
-      'Shellfish',
-      'Tree Nuts',
-      'Peanuts',
-      'Soy',
-      'Sesame',
-    ]
+    const allergenOptions = ['Gluten','Dairy','Eggs','Fish','Shellfish','Tree Nuts','Peanuts','Soy','Sesame']
 
     return (
       <div className="hc-card">
-        <button className="hc-back-btn" onClick={() => setScreen('main')}>
-          ← Back
-        </button>
+        <button className="hc-back-btn" onClick={() => setScreen('main')}>← Back</button>
 
-        <h2 style={{fontSize: '20px', fontWeight: '700', marginBottom: '24px', color: '#e2e8f0'}}>
-          Tell us about your allergies
+        <h2 style={{fontSize:'18px',fontWeight:'700',marginBottom:'16px',color:'#e2e8f0'}}>
+          Food Allergy Declaration
         </h2>
 
-        <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '24px'}}>
+        <div style={{display:'flex',flexWrap:'wrap',gap:'8px',marginBottom:'20px'}}>
           {allergenOptions.map((allergen) => (
             <button
               key={allergen}
@@ -520,32 +443,19 @@ function App() {
           ))}
         </div>
 
-        <div style={{marginBottom: '24px'}}>
-          <div style={{fontSize: '14px', fontWeight: '700', marginBottom: '12px', color: '#e2e8f0'}}>
-            Severity:
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-            {(['mild', 'moderate', 'severe', 'anaphylactic'] as AllergenSeverity[]).map(
-              (severity) => (
-                <div
-                  key={severity}
-                  className={`hc-severity-option ${allergenSeverity === severity ? 'selected' : ''}`}
-                  onClick={() => setAllergenSeverity(severity)}
-                >
-                  <input
-                    type="radio"
-                    name="severity"
-                    value={severity}
-                    checked={allergenSeverity === severity}
-                    onChange={() => setAllergenSeverity(severity)}
-                    style={{margin: 0}}
-                  />
-                  <span style={{fontSize: '14px'}}>
-                    {severity.charAt(0).toUpperCase() + severity.slice(1)}
-                  </span>
-                </div>
-              )
-            )}
+        <div style={{marginBottom:'20px'}}>
+          <div style={{fontSize:'12px',fontWeight:'600',letterSpacing:'.08em',marginBottom:'10px',color:'#94a3b8'}}>SEVERITY</div>
+          <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+            {(['mild','moderate','severe','anaphylactic'] as AllergenSeverity[]).map((severity) => (
+              <div
+                key={severity}
+                className={`hc-severity-option ${allergenSeverity === severity ? 'selected' : ''}`}
+                onClick={() => setAllergenSeverity(severity)}
+              >
+                <input type="radio" name="severity" value={severity} checked={allergenSeverity === severity} onChange={() => setAllergenSeverity(severity)} style={{margin:0}} />
+                <span style={{fontSize:'13px'}}>{severity.charAt(0).toUpperCase() + severity.slice(1)}</span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -555,15 +465,16 @@ function App() {
           value={allergenNotes}
           onChange={(e) => setAllergenNotes(e.target.value)}
           rows={3}
+          style={{marginBottom:'16px'}}
         />
 
         <button
-          className="hc-btn hc-btn-primary"
+          className="hc-btn hc-btn-allergen"
           onClick={handleAllergenSubmit}
           disabled={selectedAllergens.length === 0}
-          style={selectedAllergens.length === 0 ? {opacity: 0.5, cursor: 'not-allowed'} : {}}
+          style={selectedAllergens.length === 0 ? {opacity:0.5,cursor:'not-allowed',width:'100%',justifyContent:'center'} : {width:'100%',justifyContent:'center'}}
         >
-          Send
+          Send Allergy Alert
         </button>
 
         {submitError && <div className="hc-error">{submitError}</div>}
@@ -576,69 +487,49 @@ function App() {
     if (s === null) return null
 
     const sentimentContent = {
-      3: {
-        message: "Glad you're enjoying it!",
-        showReview: !!venue?.google_review_url,
-      },
-      2: {
-        message: "Thank you — we'd love to do better.",
-        showReview: false,
-      },
-      1: {
-        message: "We're sorry — a manager will be right with you shortly.",
-        showReview: false,
-      },
+      3: { message: "We're Happy you're Happy!", showReview: !!venue?.google_review_url },
+      2: { message: "Thank you — we'd love to do better.", showReview: false },
+      1: { message: "We're sorry — a manager will be right with you.", showReview: false },
     }[s]
 
     return (
       <div className="hc-card">
-        <div style={{fontSize: '20px', fontWeight: '700', textAlign: 'center', marginBottom: '24px', color: '#e2e8f0'}}>
-          {sentimentContent.message}
+        <div className="outcome-wrap">
+          <div className={`outcome-ring ${s === 3 ? 'ok' : s === 2 ? 'warn' : 'danger'}`}>
+            {s === 3 && <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+            {s === 2 && <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="15" x2="16" y2="15"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>}
+            {s === 1 && <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>}
+          </div>
+          <div style={{color:'#e2e8f0',fontSize:'18px',fontWeight:'700',textAlign:'center'}}>{sentimentContent.message}</div>
+
+          {sentimentContent.showReview && venue?.google_review_url && (
+            <div className="review-box">
+              <div style={{color:'#94a3b8',fontSize:'12px'}}>Mind sharing your experience?</div>
+              <a href={venue.google_review_url} target="_blank" rel="noopener noreferrer" className="review-cta">
+                ⭐ Leave a Google Review
+              </a>
+            </div>
+          )}
+
+          <button className="done-btn" onClick={() => { setSentimentScore(null); setScreen('main') }}>
+            Done
+          </button>
         </div>
-
-        {sentimentContent.showReview && venue?.google_review_url && (
-          <a
-            href={venue.google_review_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hc-btn hc-btn-primary"
-            style={{textDecoration: 'none', justifyContent: 'center'}}
-          >
-            Leave a Google Review
-          </a>
-        )}
-
-        <button
-          className="hc-btn hc-btn-ghost"
-          onClick={() => {
-            setSentimentScore(null)
-            setScreen('main')
-          }}
-          style={{marginTop: '10px'}}
-        >
-          Done
-        </button>
       </div>
     )
   }
 
   if (screen === 'success') {
     return (
-      <div
-        className="hc-card"
-        onClick={() => setScreen('main')}
-        style={{cursor: 'pointer'}}
-      >
-        <div className="hc-success-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-        </div>
-        <div style={{fontSize: '20px', fontWeight: '700', textAlign: 'center', marginBottom: '8px', color: '#e2e8f0'}}>
-          Your request has been sent
-        </div>
-        <div style={{fontSize: '16px', textAlign: 'center', color: '#94a3b8'}}>
-          We'll be right with you
+      <div className="hc-card" onClick={() => setScreen('main')} style={{cursor:'pointer'}}>
+        <div className="outcome-wrap">
+          <div className="outcome-ring ok">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <div style={{color:'#e2e8f0',fontSize:'18px',fontWeight:'700',textAlign:'center'}}>Your request has been sent</div>
+          <div style={{color:'#94a3b8',fontSize:'13px',textAlign:'center'}}>We'll be right with you</div>
         </div>
       </div>
     )
