@@ -402,76 +402,83 @@ function App() {
 
         <div className="hc-table-label">Table {asset?.label}</div>
 
-        <button
-          className="hc-btn hc-btn-primary"
-          onClick={handleRequestCheck}
-          style={isCoolingDown('check') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          Check Please
-        </button>
-        <button
-          className="hc-btn hc-btn-primary"
-          onClick={handleRequestWater}
-          style={isCoolingDown('water') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
-          Water Refill
-        </button>
-        <button
-          className="hc-btn hc-btn-primary"
-          onClick={handleRequestServer}
-          style={isCoolingDown('server') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          Waiter Needed
-        </button>
-        <button
-          className="hc-btn hc-btn-primary"
-          onClick={handleRequestPlates}
-          style={isCoolingDown('plates') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
-          Clear Table
-        </button>
+        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px'}}>
+          <button
+            className="hc-btn hc-btn-primary"
+            onClick={handleRequestCheck}
+            style={isCoolingDown('check') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Request Check
+          </button>
+          <button
+            className="hc-btn hc-btn-primary"
+            onClick={handleRequestWater}
+            style={isCoolingDown('water') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+            Refill Water
+          </button>
+          <button
+            className="hc-btn hc-btn-primary"
+            onClick={handleRequestServer}
+            style={isCoolingDown('server') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            Call Server
+          </button>
+          <button
+            className="hc-btn hc-btn-primary"
+            onClick={handleRequestPlates}
+            style={isCoolingDown('plates') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
+            Clear Plates
+          </button>
+        </div>
 
-        <button
-          className="hc-btn hc-btn-allergen"
-          onClick={() => handleServiceRequest('allergen')}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          Allergen Alert
-        </button>
+        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px'}}>
+          <button
+            className="hc-btn hc-btn-allergen"
+            onClick={() => handleServiceRequest('allergen')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Food Allergies
+          </button>
 
-        <button
-          className="hc-btn hc-btn-danger"
-          onClick={() => handleServiceRequest('critical')}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          Emergency
-        </button>
+          <button
+            className="hc-btn hc-btn-danger"
+            onClick={() => handleServiceRequest('critical')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Get Help
+          </button>
+        </div>
 
         {submitError && <div className="hc-error">{submitError}</div>}
 
-        <div className="hc-sentiment-label">How was your experience?</div>
+        <div className="hc-sentiment-label">How's everything?</div>
         <div className="hc-sentiment-row">
           <button
             className="hc-face hc-face-positive"
             onClick={() => submitSentiment(3)}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            <span style={{fontSize: '11px', marginTop: '4px', color: 'white'}}>I'm Happy</span>
           </button>
           <button
             className="hc-face hc-face-neutral"
             onClick={() => submitSentiment(2)}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 15h8"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            <span style={{fontSize: '11px', marginTop: '4px', color: 'white'}}>It was okay</span>
           </button>
           <button
             className="hc-face hc-face-negative"
             onClick={() => submitSentiment(1)}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            <span style={{fontSize: '11px', marginTop: '4px', color: 'white'}}>Disappointed</span>
           </button>
         </div>
       </div>
