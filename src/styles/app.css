@@ -22,7 +22,8 @@ body {
   color: #e2e8f0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 13px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 button {
@@ -207,12 +208,12 @@ button {
 /* ── LAYOUT ─────────────────────────────────────────────────────── */
 #root,
 .app-root {
-  height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  overflow: hidden;
+  padding: 20px 16px 40px;
 }
 
 .screen {
@@ -347,6 +348,8 @@ button {
   position: relative;
   overflow: hidden;
   animation: fadeUp 0.3s cubic-bezier(0.34, 1.2, 0.64, 1);
+  padding: 20px 16px 0;
+  gap: 9px;
 }
 
 /* ── CARD HEADER ────────────────────────────────────────────────── */
@@ -414,7 +417,7 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 6px;
   height: 88px;
   padding: 10px 6px;
   background: rgba(34, 211, 238, 0.07);
@@ -426,6 +429,9 @@ button {
   overflow: hidden;
   width: 100%;
   color: var(--cyan);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 .hc-btn.hc-btn-primary::before {
   content: '';
@@ -1180,8 +1186,8 @@ button {
 
 /* ── CARD PADDING — hc-card is the direct wrapper in App.tsx ───── */
 .hc-card {
-  padding: 20px 14px 20px;
-  gap: 8px;
+  padding: 0;
+  gap: 0;
 }
 
 /* ── SENTIMENT SECTION ───────────────────────────────────────────── */
@@ -1191,7 +1197,13 @@ button {
   font-weight: 500;
   text-align: center;
   letter-spacing: 0.02em;
-  margin-top: 6px;
+  margin-top: 10px;
+  padding-top: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.014) 100%);
+  margin-left: -16px;
+  margin-right: -16px;
+  padding-left: 16px;
+  padding-right: 16px;
 }
 
 /* THREE EQUAL COLUMNS — this is what was missing */
@@ -1199,6 +1211,12 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
+  padding-bottom: 20px;
+  background: rgba(255,255,255,.014);
+  margin-left: -16px;
+  margin-right: -16px;
+  padding-left: 16px;
+  padding-right: 16px;
 }
 
 /* ── ALLERGEN SCREEN ─────────────────────────────────────────────── */
