@@ -18,7 +18,6 @@ function App() {
   const [sentimentScore, setSentimentScore] = useState<SentimentScore | null>(null)
   const [submitError, setSubmitError] = useState('')
   const [appError, setAppError] = useState<string | null>(null)
-
   const [selectedAllergens, setSelectedAllergens] = useState<string[]>([])
   const [allergenSeverity, setAllergenSeverity] = useState<AllergenSeverity>('mild')
   const [allergenNotes, setAllergenNotes] = useState('')
@@ -149,12 +148,10 @@ function App() {
 
   const handleServiceRequest = async (category: RequestCategory) => {
     if (!venueId || !assetId) return
-
     if (category === 'allergen') {
       setScreen('allergen')
       return
     }
-
     if (category === 'critical') {
       setSubmitError('')
       const { error } = await supabase.from('requests').insert({
@@ -168,7 +165,6 @@ function App() {
       setTimeout(() => setScreen('main'), 3000)
       return
     }
-
     setSubmitError('')
     const { error } = await supabase.from('requests').insert({
       venue_id: venueId,
@@ -224,12 +220,12 @@ function App() {
   }
 
   const toggleAllergen = (allergen: string) => {
-    setSelectedAllergens((prev) =>
-      prev.includes(allergen) ? prev.filter((a) => a !== allergen) : [...prev, allergen]
+    setSelectedAllergens(prev =>
+      prev.includes(allergen) ? prev.filter(a => a !== allergen) : [...prev, allergen]
     )
   }
 
-  // ── ERROR ──────────────────────────────────────────────────────────
+  // ERROR
   if (appError) {
     const messages: Record<string, { title: string; body: string }> = {
       invalid_qr:      { title: 'Invalid QR Code',  body: 'Please scan the QR code at your table again.' },
@@ -247,7 +243,7 @@ function App() {
     )
   }
 
-  // ── SKELETON ───────────────────────────────────────────────────────
+  // SKELETON
   if (loading) {
     return (
       <div className="hc-card" style={{ padding: '22px 16px 20px', gap: '10px' }}>
@@ -273,7 +269,7 @@ function App() {
     )
   }
 
-  // ── MAIN ───────────────────────────────────────────────────────────
+  // MAIN
   if (screen === 'main') {
     return (
       <div className="hc-card">
@@ -368,7 +364,7 @@ function App() {
     )
   }
 
-  // ── ALLERGEN ───────────────────────────────────────────────────────
+  // ALLERGEN
   if (screen === 'allergen') {
     const allergenOptions = ['Gluten','Dairy','Eggs','Fish','Shellfish','Tree Nuts','Peanuts','Soy','Sesame']
     return (
@@ -379,7 +375,7 @@ function App() {
           <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '16px' }}>Select everything that applies</div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginBottom: '20px' }}>
-            {allergenOptions.map((allergen) => (
+            {allergenOptions.map(allergen => (
               <button
                 key={allergen}
                 onClick={() => toggleAllergen(allergen)}
@@ -398,8 +394,10 @@ function App() {
 
           <div style={{ color: '#94a3b8', fontSize: '11px', fontWeight: '600', letterSpacing: '.08em', marginBottom: '8px' }}>SEVERITY</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '20px' }}>
-            {(['mild','moderate','severe','anaphylactic'] as AllergenSeverity[]).map((severity) => (
-              <div key={severity} onClick={() => setAllergenSeverity(severity)}
+            {(['mild','moderate','severe','anaphylactic'] as AllergenSeverity[]).map(severity => (
+              <div
+                key={severity}
+                onClick={() => setAllergenSeverity(severity)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
                   borderRadius: '10px', cursor: 'pointer', transition: 'all .15s', fontSize: '13px',
@@ -417,7 +415,7 @@ function App() {
           <textarea
             placeholder="Anything else we should know?"
             value={allergenNotes}
-            onChange={(e) => setAllergenNotes(e.target.value)}
+            onChange={e => setAllergenNotes(e.target.value)}
             rows={3}
             style={{ width: '100%', background: '#0f1923', border: '1px solid #1e2d3d', borderRadius: '10px', padding: '10px 12px', color: '#e2e8f0', fontSize: '12px', fontFamily: 'inherit', resize: 'none', outline: 'none', marginBottom: '16px' }}
           />
@@ -441,7 +439,7 @@ function App() {
     )
   }
 
-  // ── SENTIMENT OUTCOME ──────────────────────────────────────────────
+  // SENTIMENT OUTCOME
   if (screen === 'sentiment') {
     const s = sentimentScore
     if (s === null) return null
@@ -476,11 +474,15 @@ function App() {
             <div className="outcome-ring" style={cfg.ringStyle}>{cfg.icon}</div>
             <div style={{ color: '#e2e8f0', fontSize: '18px', fontWeight: '700', textAlign: 'center' }}>{cfg.title}</div>
             <div style={{ color: '#94a3b8', fontSize: '13px', lineHeight: '1.5', textAlign: 'center' }}>{cfg.body}</div>
-            {cfg.showReview && venue?.google_review_url && (
+            {cfg.showReview && (
               <div className="review-box">
                 <div style={{ color: '#e2e8f0', fontSize: '13px', fontWeight: '600' }}>Mind sharing on Google?</div>
                 <div style={{ color: '#94a3b8', fontSize: '12px' }}>It helps other guests find us.</div>
-                <a href={venue.google_review_url} target="_blank" rel="noopener noreferrer" className="review-cta">⭐ Leave a Google Review</a>
+                {venue?.google_review_url ? (
+                  <a href={venue.google_review_url} target="_blank" rel="noopener noreferrer" className="review-cta">⭐ Leave a Google Review</a>
+                ) : (
+                  <button className="review-cta" style={{ opacity: 0.5, cursor: 'default' }}>⭐ Leave a Google Review</button>
+                )}
               </div>
             )}
             <button className="done-btn" onClick={() => { setSentimentScore(null); setScreen('main') }}>Done</button>
@@ -490,14 +492,16 @@ function App() {
     )
   }
 
-  // ── SUCCESS ────────────────────────────────────────────────────────
+  // SUCCESS
   if (screen === 'success') {
     return (
       <div className="hc-card" onClick={() => setScreen('main')} style={{ cursor: 'pointer' }}>
         <div className="card-top">
           <div className="outcome-wrap">
             <div className="outcome-ring" style={{ background: 'rgba(16,185,129,.1)', border: '2px solid #10b981', boxShadow: '0 0 28px rgba(16,185,129,.18)' }}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
             </div>
             <div style={{ color: '#e2e8f0', fontSize: '18px', fontWeight: '700', textAlign: 'center' }}>Your request has been sent</div>
             <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center' }}>We'll be right with you</div>
