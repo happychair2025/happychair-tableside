@@ -417,31 +417,30 @@ button {
   gap: 7px;
   height: 88px;
   padding: 10px 6px;
-  background: rgba(34, 211, 238, 0.05);
-  border: 1px solid rgba(34, 211, 238, 0.11);
+  background: rgba(34, 211, 238, 0.07);
+  border: 1px solid rgba(34, 211, 238, 0.18);
   border-radius: 14px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, transform 0.12s, box-shadow 0.15s;
   position: relative;
   overflow: hidden;
   width: 100%;
+  color: var(--cyan);
 }
 .hc-btn.hc-btn-primary::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 50% -15%, rgba(34, 211, 238, 0.15) 0%, transparent 65%);
-  opacity: 0;
-  transition: opacity 0.2s;
+  background: radial-gradient(ellipse at 50% -20%, rgba(34, 211, 238, 0.22) 0%, transparent 70%);
+  opacity: 1;
   border-radius: 14px;
 }
 .hc-btn.hc-btn-primary:hover {
-  background: rgba(34, 211, 238, 0.09);
-  border-color: rgba(34, 211, 238, 0.26);
-  box-shadow: 0 4px 16px rgba(34, 211, 238, 0.1), inset 0 1px 0 rgba(34, 211, 238, 0.13);
+  background: rgba(34, 211, 238, 0.12);
+  border-color: rgba(34, 211, 238, 0.32);
+  box-shadow: 0 4px 16px rgba(34, 211, 238, 0.12), inset 0 1px 0 rgba(34, 211, 238, 0.16);
   transform: translateY(-2px);
 }
-.hc-btn.hc-btn-primary:hover::before { opacity: 1 }
 .hc-btn.hc-btn-primary:active { transform: scale(0.93) }
 
 /* PENDING STATE */
@@ -670,8 +669,8 @@ button {
 
 /* Positive — I'm Happy */
 .hc-face.hc-face-positive {
-  border-color: rgba(16, 185, 129, 0.18);
-  background: rgba(16, 185, 129, 0.04);
+  border-color: rgba(16, 185, 129, 0.28);
+  background: rgba(16, 185, 129, 0.08);
 }
 .hc-face.hc-face-positive:hover {
   border-color: rgba(16, 185, 129, 0.36);
@@ -682,8 +681,8 @@ button {
 
 /* Neutral — It was okay */
 .hc-face.hc-face-neutral {
-  border-color: rgba(245, 158, 11, 0.18);
-  background: rgba(245, 158, 11, 0.04);
+  border-color: rgba(245, 158, 11, 0.28);
+  background: rgba(245, 158, 11, 0.08);
 }
 .hc-face.hc-face-neutral:hover {
   border-color: rgba(245, 158, 11, 0.36);
@@ -693,8 +692,8 @@ button {
 
 /* Negative — Disappointed */
 .hc-face.hc-face-negative {
-  border-color: rgba(239, 68, 68, 0.18);
-  background: rgba(239, 68, 68, 0.04);
+  border-color: rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.08);
 }
 .hc-face.hc-face-negative:hover {
   border-color: rgba(239, 68, 68, 0.36);
@@ -1181,8 +1180,8 @@ button {
 
 /* ── CARD PADDING — hc-card is the direct wrapper in App.tsx ───── */
 .hc-card {
-  padding: 24px 16px 20px;
-  gap: 10px;
+  padding: 20px 14px 20px;
+  gap: 8px;
 }
 
 /* ── SENTIMENT SECTION ───────────────────────────────────────────── */
