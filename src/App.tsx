@@ -36,6 +36,10 @@ function App() {
   const [curVenue, setCurVenue] = useState('dining')
   const [buttonStates, setButtonStates] = useState<Record<string, ServiceButtonState>>({})
   const [elapsedTimes, setElapsedTimes] = useState<Record<string, number>>({})
+  const [okayNote, setOkayNote] = useState('')
+  const [sadNote, setSadNote] = useState('')
+  const [okayFeedback, setOkayFeedback] = useState<{sent:boolean,submitTime:Date|null,ackTime:Date|null,resolveTime:Date|null}>({sent:false,submitTime:null,ackTime:null,resolveTime:null})
+  const [sadFeedback, setSadFeedback] = useState<{sent:boolean,submitTime:Date|null,ackTime:Date|null,resolveTime:Date|null}>({sent:false,submitTime:null,ackTime:null,resolveTime:null})
 
   const venueId = new URLSearchParams(window.location.search).get('venue')
   const assetId = new URLSearchParams(window.location.search).get('table')
@@ -412,6 +416,61 @@ function App() {
     )
   }
 
+  const Face = ({type, size}: {type:'ok'|'warn'|'danger', size:number}) => {
+    const colors = {ok:'#10b981', warn:'#f59e0b', danger:'#ef4444'}
+    const mouths = {
+      ok: <path d="M8 14s1.5 2 4 2 4-2 4-2"/>,
+      warn: <line x1="8" y1="15" x2="16" y2="15"/>,
+      danger: <path d="M16 16s-1.5-2-4-2-4 2-4 2"/>
+    }
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+        stroke={colors[type]} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        {mouths[type]}
+        <line x1="9" y1="9" x2="9.01" y2="9"/>
+        <line x1="15" y1="9" x2="15.01" y2="9"/>
+      </svg>
+    )
+  }
+
+  const handleOkaySend = () => {
+    const now = new Date()
+    setOkayFeedback({sent:true, submitTime:now, ackTime:null, resolveTime:null})
+
+    const ackDelay = 3000 + Math.random() * 4000
+    setTimeout(() => {
+      setOkayFeedback(prev => ({...prev, ackTime: new Date()}))
+
+      const resolveDelay = 8000 + Math.random() * 7000
+      setTimeout(() => {
+        setOkayFeedback(prev => ({...prev, resolveTime: new Date()}))
+        setTimeout(() => go('resolve'), 2000)
+      }, resolveDelay)
+    }, ackDelay)
+  }
+
+  const handleSadSend = () => {
+    const now = new Date()
+    setSadFeedback({sent:true, submitTime:now, ackTime:null, resolveTime:null})
+
+    const ackDelay = 3000 + Math.random() * 4000
+    setTimeout(() => {
+      setSadFeedback(prev => ({...prev, ackTime: new Date()}))
+
+      const resolveDelay = 8000 + Math.random() * 7000
+      setTimeout(() => {
+        setSadFeedback(prev => ({...prev, resolveTime: new Date()}))
+        setTimeout(() => go('resolve'), 2000)
+      }, resolveDelay)
+    }, ackDelay)
+  }
+
+  const formatTime = (date: Date | null) => {
+    if (!date) return '—'
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  }
+
   const getIcon = (ic: string): React.ReactElement => {
     const icons: Record<string, React.ReactElement> = {
       ck: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
@@ -703,19 +762,216 @@ function App() {
   }
 
   if (screen === 'happy') {
-    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Happy Screen — Phase 2</div></div>
+    return (
+      <div className="sc" style={{position:'relative'}}>
+        <div className="close-x" onClick={() => go('main')}>
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </div>
+        <div className="ob">
+          <div className="of" style={{filter:'drop-shadow(0 0 24px rgba(16,185,129,.35))'}}>
+            <Face type="ok" size={56} />
+          </div>
+          <div className="ot" style={{color:'var(--ok)'}}>Glad You're Enjoying It</div>
+          <div className="os">A quick review helps other guests and supports our team.</div>
+          <div className="ac" style={{textAlign:'center'}}>
+            <button className="ac-btn" style={{background:'var(--ok)',color:'var(--bg)',padding:'14px',width:'100%',border:'none',borderRadius:'10px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>
+              ⭐⭐⭐⭐⭐ Leave a Review
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (screen === 'okay') {
-    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Okay Screen — Phase 2</div></div>
+    return (
+      <div className="sc" style={{position:'relative'}}>
+        <div className="close-x" onClick={() => go('main')}>
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </div>
+        <div className="ob">
+          <div className="of" style={{filter:'drop-shadow(0 0 24px rgba(245,158,11,.35))'}}>
+            <Face type="warn" size={56} />
+          </div>
+          <div className="ot" style={{color:'var(--warn)'}}>We Can Make This Better</div>
+          <div className="os">{okayFeedback.sent ? 'A server has been notified.' : 'A server is coming by to help.'}</div>
+
+          {!okayFeedback.sent ? (
+            <div className="fc">
+              <div className="fc-t">What Can We Fix Right Now?</div>
+              <div className="fc-s">Share a quick note so we can help faster.</div>
+              <textarea
+                className="fc-ta"
+                placeholder="What can we improve?"
+                value={okayNote}
+                onChange={(e) => setOkayNote(e.target.value)}
+                rows={4}
+                style={{borderColor:'var(--b)',focusBorderColor:'var(--warn)'} as React.CSSProperties}
+              />
+              <button
+                className="fc-btn"
+                style={{background:'var(--warn)',color:'var(--bg)'}}
+                onClick={handleOkaySend}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"/>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+                Send to Server
+              </button>
+            </div>
+          ) : (
+            <div className="fc">
+              <div style={{textAlign:'center',marginBottom:'16px'}}>
+                <div style={{width:'48px',height:'48px',borderRadius:'50%',background:'var(--warn)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </div>
+              </div>
+              <div className="fc-t">Sent to Your Server</div>
+              <div className="fc-s">Your server has been notified.</div>
+
+              <div className="tt">
+                <div className="tt-r">
+                  <div className="tt-dot" style={{background:'var(--ok)'}} />
+                  <div className="tt-l">Submitted</div>
+                  <div className="tt-v">{formatTime(okayFeedback.submitTime)}</div>
+                </div>
+                <div className="tt-r">
+                  <div className={`tt-dot ${!okayFeedback.ackTime ? 'pulse' : ''}`} style={{background:okayFeedback.ackTime ? 'var(--ok)' : 'var(--warn)'}} />
+                  <div className="tt-l">Server Acknowledged</div>
+                  <div className="tt-v">{okayFeedback.ackTime ? formatTime(okayFeedback.ackTime) : 'waiting…'}</div>
+                </div>
+                <div className="tt-r">
+                  <div className="tt-dot" style={{background:okayFeedback.resolveTime ? 'var(--ok)' : '#4b5563'}} />
+                  <div className="tt-l">Resolved</div>
+                  <div className="tt-v">{formatTime(okayFeedback.resolveTime)}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   if (screen === 'sad') {
-    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Sad Screen — Phase 2</div></div>
+    return (
+      <div className="sc" style={{position:'relative'}}>
+        <div className="close-x" onClick={() => go('main')}>
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </div>
+        <div className="ob">
+          <div className="of" style={{filter:'drop-shadow(0 0 24px rgba(239,68,68,.35))'}}>
+            <Face type="danger" size={56} />
+          </div>
+          <div className="ot" style={{color:'var(--danger)'}}>We're Sorry. Let's Make This Right.</div>
+          <div className="os">{sadFeedback.sent ? 'A manager has been notified.' : 'A manager is on the way now.'}</div>
+
+          {!sadFeedback.sent ? (
+            <div className="fc">
+              <div className="fc-t">Tell Us What Happened</div>
+              <div className="fc-s">This helps us resolve it quickly.</div>
+              <textarea
+                className="fc-ta"
+                placeholder="What went wrong?"
+                value={sadNote}
+                onChange={(e) => setSadNote(e.target.value)}
+                rows={4}
+                style={{borderColor:'var(--b)',focusBorderColor:'var(--danger)'} as React.CSSProperties}
+              />
+              <button
+                className="fc-btn"
+                style={{background:'var(--danger)',color:'var(--bg)'}}
+                onClick={handleSadSend}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"/>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+                Send to Manager
+              </button>
+            </div>
+          ) : (
+            <div className="fc">
+              <div style={{textAlign:'center',marginBottom:'16px'}}>
+                <div style={{width:'48px',height:'48px',borderRadius:'50%',background:'var(--danger)',display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </div>
+              </div>
+              <div className="fc-t">Sent to Manager</div>
+              <div className="fc-s">A manager has been notified.</div>
+
+              <div className="tt">
+                <div className="tt-r">
+                  <div className="tt-dot" style={{background:'var(--ok)'}} />
+                  <div className="tt-l">Submitted</div>
+                  <div className="tt-v">{formatTime(sadFeedback.submitTime)}</div>
+                </div>
+                <div className="tt-r">
+                  <div className={`tt-dot ${!sadFeedback.ackTime ? 'pulse' : ''}`} style={{background:sadFeedback.ackTime ? 'var(--ok)' : 'var(--warn)'}} />
+                  <div className="tt-l">Manager Acknowledged</div>
+                  <div className="tt-v">{sadFeedback.ackTime ? formatTime(sadFeedback.ackTime) : 'waiting…'}</div>
+                </div>
+                <div className="tt-r">
+                  <div className="tt-dot" style={{background:sadFeedback.resolveTime ? 'var(--ok)' : '#4b5563'}} />
+                  <div className="tt-l">Resolved</div>
+                  <div className="tt-v">{formatTime(sadFeedback.resolveTime)}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   if (screen === 'resolve') {
-    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Resolved Screen — Phase 2</div></div>
+    return (
+      <div className="sc" style={{position:'relative'}}>
+        <div className="close-x" onClick={() => go('main')}>
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </div>
+        <div className="ob">
+          <div className="of" style={{filter:'drop-shadow(0 0 24px rgba(34,211,238,.35))'}}>
+            <Face type="ok" size={56} />
+          </div>
+          <div className="ot" style={{color:'var(--cyan)'}}>Did We Make It Right?</div>
+          <div className="os">We hope your experience improved.</div>
+          <div className="rbtns">
+            <button
+              className="rbtn"
+              style={{background:'var(--cyan)',color:'var(--bg)',border:'none'}}
+              onClick={() => go('happy')}
+            >
+              Yes, All Good
+            </button>
+            <button
+              className="rbtn"
+              style={{background:'transparent',color:'var(--t1)',border:'1px solid var(--b)'}}
+              onClick={() => go('main')}
+            >
+              Not Yet
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (screen === 'allergy') {
