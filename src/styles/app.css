@@ -144,7 +144,6 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 .rk[data-v=discomfort].on{border-color:#22d3ee;background:rgba(34,211,238,.06)}
 .rk[data-v=severe].on{border-color:#f59e0b;background:rgba(245,158,11,.08)}
 .rk[data-v=anaphylaxis].on{border-color:#ef4444;background:rgba(239,68,68,.08)}
-.bar{position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:10px 0 0 10px}
 .rk-n{font-size:13px;font-weight:700}.rk-d{color:var(--t2);font-size:12px;margin-top:3px}
 .ccr{display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--s1);border:1px solid var(--b);border-radius:10px;cursor:pointer;margin-bottom:14px;transition:.15s}
 .ccr:hover{border-color:var(--b2)}.ccr.on{border-color:#f59e0b;background:rgba(245,158,11,.06)}
