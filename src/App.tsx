@@ -3,7 +3,9 @@ import { supabase } from './lib/supabase'
 import type {
   Venue,
   Asset,
+  RequestCategory,
   SentimentScore,
+  AllergenSeverity,
 } from './types'
 
 // ══════════════════════════════════════════════════════════════
@@ -80,7 +82,7 @@ const HandIcon = () => (
 );
 
 // Service button icons
-const SvcIcons: Record<string, React.ReactElement> = {
+const SvcIcons: Record<string, JSX.Element> = {
   ck: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
   wa: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>,
   be: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
@@ -123,7 +125,7 @@ function App() {
   const searchRef = useRef<HTMLDivElement>(null)
 
   // ── URGENT STATE ──
-  const [, setHoldStart] = useState<number|null>(null)
+  const [holdStart, setHoldStart] = useState<number|null>(null)
   const [holdProgress, setHoldProgress] = useState(0)
   const [holdPhase, setHoldPhase] = useState(0)
   const holdRAF = useRef<number|null>(null)
@@ -432,7 +434,7 @@ function App() {
       {showSplash && (
         <div id="splash" style={{position:'fixed',inset:0,zIndex:9999,background:'#0d1117',display:'flex',alignItems:'center',justifyContent:'center',transition:'opacity .7s,transform .7s',...(!showSplash?{opacity:0,transform:'scale(1.08)',pointerEvents:'none' as const}:{})}}>
           <svg width="90" height="112" viewBox="0 0 72.71 90.04" style={{animation:'logoIn .9s cubic-bezier(.34,1.2,.64,1) both'}}>
-            <path fill="#22d3ee" d="M36.36,0C16.28,0,.6,16.3,.01,36.36c-.64,21.77,29.31,48.22,35.31,53.29.61.52,1.48.52,2.08,0,5.96-4.98,35.31-30.65,35.31-53.31C72.71,16.27,56.43,0,36.36,0z" style={{opacity:0,animation:'fade .5s .4s forwards'}}/>
+            <path fill="#22d3ee" d="M36.36,0C16.28,0,.6,16.3.01,36.36c-.64,21.77,29.31,48.22,35.31,53.29.61.52,1.48.52,2.08,0,5.96-4.98,35.31-30.65,35.31-53.31C72.71,16.27,56.43,0,36.36,0z" style={{opacity:0,animation:'fade .5s .4s forwards'}}/>
             <path fill="#fff" d="M25.11,17.28c0-1.61,1.3-2.91,2.91-2.91s2.91,1.3,2.91,2.91v12.86h13.77c1.61,0,2.91,1.3,2.91,2.91v14.3c0,1.6-1.3,2.91-2.91,2.91s-2.91-1.31-2.91-2.91v-11.4h-10.86v11.98c0,1.6-1.31,2.91-2.91,2.91s-2.91-1.31-2.91-2.91v-30.65z" style={{opacity:0,animation:'fade .4s .7s forwards'}}/>
             <path fill="#fff" d="M56.41,54.42c-3.84,7.64-11.53,12.39-20.07,12.39s-16.31-4.87-20.07-12.4c-.71-1.44-.12-3.18,1.31-3.9,1.44-.71,3.18-.12,3.9,1.31,2.77,5.57,8.61,9.18,14.86,9.18s12.02-3.52,14.87-9.19c.73-1.43,2.47-2.01,3.9-1.28,1.44.71,2.02,2.47,1.3,3.9z" style={{opacity:0,animation:'fade .4s .7s forwards'}}/>
           </svg>
@@ -769,7 +771,7 @@ function App() {
               <div style={{background:'var(--s1)',border:'1px solid var(--b)',borderRadius:'18px',padding:'28px 24px',maxWidth:'320px',width:'100%'}}>
                 <div style={{textAlign:'center',marginBottom:'8px'}}>
                   <svg width="48" height="60" viewBox="0 0 72.71 90.04">
-                    <path fill="#22d3ee" d="M36.36,0C16.28,0,.6,16.3,.01,36.36c-.64,21.77,29.31,48.22,35.31,53.29.61.52,1.48.52,2.08,0,5.96-4.98,35.31-30.65,35.31-53.31C72.71,16.27,56.43,0,36.36,0z"/>
+                    <path fill="#22d3ee" d="M36.36,0C16.28,0,.6,16.3.01,36.36c-.64,21.77,29.31,48.22,35.31,53.29.61.52,1.48.52,2.08,0,5.96-4.98,35.31-30.65,35.31-53.31C72.71,16.27,56.43,0,36.36,0z"/>
                     <path fill="#fff" d="M25.11,17.28c0-1.61,1.3-2.91,2.91-2.91s2.91,1.3,2.91,2.91v12.86h13.77c1.61,0,2.91,1.3,2.91,2.91v14.3c0,1.6-1.3,2.91-2.91,2.91s-2.91-1.31-2.91-2.91v-11.4h-10.86v11.98c0,1.6-1.31,2.91-2.91,2.91s-2.91-1.31-2.91-2.91v-30.65z"/>
                     <path fill="#fff" d="M56.41,54.42c-3.84,7.64-11.53,12.39-20.07,12.39s-16.31-4.87-20.07-12.4c-.71-1.44-.12-3.18,1.31-3.9,1.44-.71,3.18-.12,3.9,1.31,2.77,5.57,8.61,9.18,14.86,9.18s12.02-3.52,14.87-9.19c.73-1.43,2.47-2.01,3.9-1.28,1.44.71,2.02,2.47,1.3,3.9z"/>
                   </svg>
