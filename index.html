@@ -24,9 +24,7 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 .vsw{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;flex-shrink:0}
 .vb{padding:6px 12px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--b);background:var(--s1);color:var(--t2);white-space:nowrap;flex-shrink:0;transition:.15s}
 .vb.on{background:rgba(34,211,238,.1);border-color:var(--cyan);color:var(--cyan)}
-.nav-removed{background:#050b14;border-bottom:1px solid var(--b);display:flex;overflow-x:auto;flex-shrink:0;height:36px}
-.tab-removed{padding:0 10px;height:36px;display:flex;align-items:center;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;flex-shrink:0;transition:.15s}
-.tab:hover{color:var(--t1)}.tab.on{color:var(--cyan);border-color:var(--cyan)}
+
 #app{height:calc(100vh - 36px);background:var(--bg);overflow:hidden;opacity:0;transition:opacity .5s .15s}
 #app.vis{opacity:1}
 .sc{display:none;flex-direction:column;height:100%;overflow:hidden}.sc.on{display:flex}
@@ -324,10 +322,6 @@ var VEN={
 };
 var curV='dining';
 
-// ── TABS ──
-
-
-
 // ── STATE ──
 var reqs=[],rid=0,decl=[],curAllergen=null,curRisk=null,curXC=false;
 var PRESETS=['Milk','Eggs','Fish','Shellfish','Tree Nuts','Peanuts','Wheat','Soy','Sesame'];
@@ -366,8 +360,6 @@ var ADB=[
 // Venue switcher
 document.getElementById('vsw').innerHTML=['🍽 Restaurant','🍺 Bar','🏨 Hotel','🏊 Pool','🏟 Stadium'].map(function(l,i){var ids=['dining','bar','hotel','pool','stadium'];return '<div class="vb'+(i===0?' on':'')+'" onclick="setVenue(\''+ids[i]+'\')">'+l+'</div>'}).join('');
 
-// Nav tabs
-
 // ── MAIN CARD BUILDER ──
 function buildCard(){
   var v=VEN[curV],icons=(v.ic||['ck','wa','be','cl']).map(function(k){return IC[k]}),cls=['','','bell',''];
@@ -393,7 +385,7 @@ function buildCard(){
 
 // ── BUILD ALL SCREENS ──
 var H='';
-H+='<div class="sc on" id="s-main"><div class="scr" id="mainScr">'+buildCard()+'</div><div class="footer">Powered by Happy Chair</div></div>';
+H+='<div class="sc on" id="s-main"><div class="scr" id="mainScr">'+buildCard()+'</div><div class="footer"></div></div>';
 H+='<div class="sc" id="s-happy" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob"><div class="of" style="filter:drop-shadow(0 0 24px rgba(16,185,129,.35))">'+face('ok',56)+'</div><div class="ot" style="color:var(--ok)">Glad You\'re Enjoying It</div><div class="os">A quick review helps other guests and supports our team.</div><div class="ac" style="text-align:center"><button class="ac-btn" style="background:var(--ok);color:var(--bg);padding:14px">'+S5+' Leave a Review</button></div><button class="done-btn" onclick="go(\'main\')">Done</button></div></div>';
 H+='<div class="sc" id="s-okay" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob" id="okayBody"><div class="of" style="filter:drop-shadow(0 0 24px rgba(245,158,11,.35))">'+face('warn',56)+'</div><div class="ot" style="color:#f59e0b">We Can Make This Better</div><div class="os">A server is coming by to help.</div><div class="ac" style="border-color:rgba(245,158,11,.25)"><div class="ac-t">What Can We Fix Right Now?</div><div class="ac-s">Share a quick note so we can help faster.</div><textarea class="ac-ta" id="okTxt" placeholder="What can we improve?"></textarea><button class="ac-btn" style="background:#f59e0b;color:var(--bg)" onclick="sendFeedback(\'okay\')">'+IC.snd+' Send to Server</button></div><button class="done-btn" onclick="go(\'main\')">Done</button></div></div>';
 H+='<div class="sc" id="s-sad" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob" id="sadBody"><div class="of" style="filter:drop-shadow(0 0 24px rgba(239,68,68,.35))">'+face('danger',56)+'</div><div class="ot" style="color:var(--danger)">We\'re Sorry. Let\'s Make This Right.</div><div class="os">A manager is on the way now.</div><div class="ac" style="border-color:rgba(239,68,68,.25)"><div class="ac-t">Tell Us What Happened</div><div class="ac-s">This helps us resolve it quickly.</div><textarea class="ac-ta" id="sadTxt" placeholder="What went wrong?"></textarea><button class="ac-btn" style="background:var(--danger);color:#fff" onclick="sendFeedback(\'sad\')">'+IC.snd+' Send to Manager</button></div><button class="done-btn" onclick="go(\'main\')">Done</button></div></div>';
@@ -428,7 +420,7 @@ function go(id){
 function goSent(id){
   var scores={happy:3,okay:2,sad:1};
   if(scores[id])insertSentiment(scores[id]);var z=document.getElementById('sentZone');if(z){z.classList.remove('flash');void z.offsetWidth;z.classList.add('flash')}setTimeout(function(){go(id)},200)}
-function setVenue(id){curV=id;document.querySelectorAll('.vb').forEach(function(b,i){var ids=['dining','bar','hotel','pool','stadium'];b.classList.toggle('on',ids[i]===id)});document.getElementById('mainScr').innerHTML=buildCard()+'<div class="footer">Powered by Happy Chair</div>';go('main')}
+function setVenue(id){curV=id;document.querySelectorAll('.vb').forEach(function(b,i){var ids=['dining','bar','hotel','pool','stadium'];b.classList.toggle('on',ids[i]===id)});document.getElementById('mainScr').innerHTML=buildCard();go('main')}
 
 // ══════════════════════════════════════════════════════════════
 // SERVICE REQUESTS (Uber-style)
