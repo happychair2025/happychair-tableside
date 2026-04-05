@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from './lib/supabase'
 import type {
   Venue,
@@ -7,6 +7,31 @@ import type {
   SentimentScore,
   AllergenSeverity,
 } from './types'
+
+const ALLERGEN_DB = [
+  {n:'Milk',c:'Major 9'},{n:'Eggs',c:'Major 9'},{n:'Fish',c:'Major 9'},{n:'Shellfish',c:'Major 9'},
+  {n:'Tree Nuts',c:'Major 9'},{n:'Peanuts',c:'Major 9'},{n:'Wheat',c:'Major 9'},{n:'Soy',c:'Major 9'},
+  {n:'Sesame',c:'Major 9'},{n:'Salmon',c:'Fish'},{n:'Tuna',c:'Fish'},{n:'Cod',c:'Fish'},
+  {n:'Shrimp',c:'Shellfish'},{n:'Crab',c:'Shellfish'},{n:'Lobster',c:'Shellfish'},
+  {n:'Almonds',c:'Tree Nut'},{n:'Cashews',c:'Tree Nut'},{n:'Walnuts',c:'Tree Nut'},
+  {n:'Pecans',c:'Tree Nut'},{n:'Pistachios',c:'Tree Nut'},{n:'Hazelnuts',c:'Tree Nut'},
+  {n:'Butter',c:'Dairy'},{n:'Cream',c:'Dairy'},{n:'Cheese',c:'Dairy'},{n:'Yogurt',c:'Dairy'},
+  {n:'Whey',c:'Dairy'},{n:'Casein',c:'Dairy'},{n:'Gluten',c:'Grain'},{n:'Barley',c:'Grain'},
+  {n:'Rye',c:'Grain'},{n:'Oats',c:'Grain'},{n:'Corn',c:'Grain'},{n:'Mustard',c:'Spice'},
+  {n:'Celery',c:'Vegetable'},{n:'Garlic',c:'Vegetable'},{n:'Onion',c:'Vegetable'},
+  {n:'Tomato',c:'Vegetable'},{n:'Mushroom',c:'Vegetable'},{n:'Soy Sauce',c:'Sauce'},
+  {n:'Fish Sauce',c:'Sauce'},{n:'Oyster Sauce',c:'Sauce'},{n:'Sulfites',c:'Additive'},
+  {n:'MSG',c:'Additive'},{n:'Gelatin',c:'Meat'},{n:'Honey',c:'Other'},{n:'Alcohol',c:'Other'},
+]
+
+const PRESET_ALLERGENS = ['Milk','Eggs','Fish','Shellfish','Tree Nuts','Peanuts','Wheat','Soy','Sesame']
+
+const SEVERITY_OPTIONS = [
+  {v:'unsure',l:'Not Sure',d:"I'm not certain",c:'#94a3b8',dots:'—'},
+  {v:'discomfort',l:'Causes Discomfort',d:'Mild reaction',c:'#22d3ee',dots:'●'},
+  {v:'severe',l:'Severe Reaction',d:'Serious response',c:'#f59e0b',dots:'● ●'},
+  {v:'anaphylaxis',l:'Anaphylaxis Risk',d:'Life-threatening',c:'#ef4444',dots:'● ● ●'},
+]
 
 type Screen = 'loading' | 'error' | 'main' | 'allergen' | 'sentiment' | 'success' | 'happy' | 'okay' | 'sad' | 'resolve' | 'allergy' | 'alwait' | 'alack' | 'urgent'
 
@@ -32,6 +57,17 @@ function App() {
   const [allergenNotes, setAllergenNotes] = useState('')
   const [cooldowns, setCooldowns] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
+
+  const [decl, setDecl] = useState<Array<{name:string,risk:string,xc:boolean}>>([])
+  const [curAllergen, setCurAllergen] = useState<string|null>(null)
+  const [curRisk, setCurRisk] = useState<string|null>(null)
+  const [curXC, setCurXC] = useState(false)
+  const [allergenSearch, setAllergenSearch] = useState('')
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const [allergyNotes, setAllergyNotes] = useState('')
+  const [shakeSubmit, setShakeSubmit] = useState(false)
+  const [showHint, setShowHint] = useState(false)
+  const searchRef = useRef<HTMLDivElement>(null)
 
   const [curVenue, setCurVenue] = useState('dining')
   const [buttonStates, setButtonStates] = useState<Record<string, ServiceButtonState>>({})
@@ -113,6 +149,16 @@ function App() {
     }, 1000)
     return () => clearInterval(interval)
   }, [buttonStates])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSearchResults(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const updateButtonState = (key: string, state: ButtonState) => {
     setButtonStates(prev => ({
@@ -975,15 +1021,305 @@ function App() {
   }
 
   if (screen === 'allergy') {
-    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Allergy Screen — Phase 2</div></div>
+    const filteredResults = allergenSearch.length > 0
+      ? ALLERGEN_DB.filter(a => a.n.toLowerCase().includes(allergenSearch.toLowerCase())).slice(0, 6)
+      : []
+    const exactMatch = ALLERGEN_DB.some(a => a.n.toLowerCase() === allergenSearch.toLowerCase())
+
+    const handleAddAllergen = () => {
+      if (!curAllergen || !curRisk) return
+      setDecl(prev => [...prev, { name: curAllergen, risk: curRisk, xc: curXC }])
+      setCurAllergen(null)
+      setCurRisk(null)
+      setCurXC(false)
+    }
+
+    const handleRemoveAllergen = (index: number) => {
+      setDecl(prev => prev.filter((_, i) => i !== index))
+    }
+
+    const handleSelectPreset = (allergen: string) => {
+      const alreadyAdded = decl.some(d => d.name === allergen)
+      if (alreadyAdded) return
+      setCurAllergen(allergen)
+      setCurRisk(null)
+      setCurXC(false)
+    }
+
+    const handleSearchSelect = (name: string) => {
+      setCurAllergen(name)
+      setCurRisk(null)
+      setCurXC(false)
+      setAllergenSearch('')
+      setShowSearchResults(false)
+    }
+
+    const handleAddCustom = () => {
+      if (allergenSearch.trim()) {
+        setCurAllergen(allergenSearch.trim())
+        setCurRisk(null)
+        setCurXC(false)
+        setAllergenSearch('')
+        setShowSearchResults(false)
+      }
+    }
+
+    const handleNotifyStaff = () => {
+      if (decl.length === 0) {
+        setShakeSubmit(true)
+        setShowHint(true)
+        setTimeout(() => setShakeSubmit(false), 500)
+        setTimeout(() => setShowHint(false), 3000)
+        return
+      }
+      go('alwait')
+    }
+
+    const getSeverityStyle = (risk: string) => {
+      const opt = SEVERITY_OPTIONS.find(s => s.v === risk)
+      if (!opt) return {}
+      return {
+        background: opt.c + '20',
+        border: `1px solid ${opt.c}`,
+        color: opt.c
+      }
+    }
+
+    return (
+      <div className="sc" style={{position:'relative'}}>
+        <div className="close-x" onClick={() => go('main')}>
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </div>
+        <div className="scr" style={{paddingTop:'14px'}}>
+          <div style={{textAlign:'center',marginBottom:'6px'}}>
+            <div style={{width:'56px',height:'56px',background:'rgba(245,158,11,.08)',border:'2px solid #f59e0b',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px'}}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+            </div>
+            <div className="pt" style={{justifyContent:'center'}}>Tell Us About Your Allergies</div>
+          </div>
+          <div className="ps">Select any allergies or add your own.</div>
+
+          {decl.length > 0 && (
+            <div className="dl" style={{margin:'0 18px 16px'}}>
+              <div className="sec">Your Allergies</div>
+              {decl.map((d, i) => {
+                const opt = SEVERITY_OPTIONS.find(s => s.v === d.risk)
+                return (
+                  <div className="di" key={i}>
+                    <div className="di-n">{d.name}</div>
+                    <div className="di-b" style={getSeverityStyle(d.risk)}>{opt?.l || d.risk}</div>
+                    {d.xc && <div className="di-xc">Cross-Contact</div>}
+                    <button className="di-rm" onClick={() => handleRemoveAllergen(i)}>✕</button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="sec">Search Allergies</div>
+          <div className="srw" ref={searchRef}>
+            <div className="sri">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+            </div>
+            <input
+              className="srb"
+              placeholder="Search — butter, fish stock, gluten..."
+              value={allergenSearch}
+              onChange={(e) => {
+                setAllergenSearch(e.target.value)
+                setShowSearchResults(true)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && allergenSearch.trim()) {
+                  handleAddCustom()
+                }
+              }}
+            />
+            {showSearchResults && allergenSearch.length > 0 && (
+              <div className="srl open">
+                {filteredResults.map((item, idx) => (
+                  <div key={idx} className="srl-i" onClick={() => handleSearchSelect(item.n)}>
+                    <div className="srl-n">{item.n}</div>
+                    <div className="srl-c">{item.c}</div>
+                  </div>
+                ))}
+                {!exactMatch && allergenSearch.trim() && (
+                  <div className="srl-new" onClick={handleAddCustom}>
+                    + Add "{allergenSearch}" as custom
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="sec">Select Common Allergies</div>
+          <div className="chips">
+            {PRESET_ALLERGENS.map(p => {
+              const alreadyAdded = decl.some(d => d.name === p)
+              const isSelected = curAllergen === p
+              return (
+                <button
+                  key={p}
+                  className={`chip ${alreadyAdded ? 'added' : isSelected ? 'on' : ''}`}
+                  onClick={() => handleSelectPreset(p)}
+                >
+                  {p}{alreadyAdded ? ' ✓' : ''}
+                </button>
+              )
+            })}
+          </div>
+
+          {curAllergen && (
+            <div className="cfg">
+              <div className="cfg-t">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                {curAllergen}
+              </div>
+              <div className="cfg-s">How Serious Is It? <span style={{fontWeight:500,textTransform:'none',fontSize:'11px',color:'var(--t2)'}}>(Select One)</span></div>
+              <div className="rg">
+                {SEVERITY_OPTIONS.map(r => (
+                  <div
+                    key={r.v}
+                    className={`rk ${curRisk === r.v ? 'on' : ''}`}
+                    data-v={r.v}
+                    onClick={() => setCurRisk(r.v)}
+                  >
+                    <div style={{position:'absolute',left:0,top:0,bottom:0,width:'3px',background:r.c,borderRadius:'10px 0 0 10px'}} />
+                    <div className="rk-n">{r.l}</div>
+                    <div className="rk-d">{r.d}</div>
+                    <div style={{color:r.c,fontSize:'10px',marginTop:'4px'}}>{r.dots}</div>
+                  </div>
+                ))}
+              </div>
+              <div className={`ccr ${curXC ? 'on' : ''}`} onClick={() => setCurXC(!curXC)}>
+                <div className="cck">
+                  {curXC && (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  )}
+                </div>
+                <div>
+                  <div style={{fontSize:'13px',fontWeight:700,color:'var(--t1)'}}>Avoid Cross-Contact</div>
+                  <div style={{fontSize:'12px',color:'var(--t2)',marginTop:'2px'}}>Separate surfaces, utensils, and prep.</div>
+                </div>
+              </div>
+              <div style={{display:'flex',justifyContent:'flex-end'}}>
+                <button className="cfg-a" disabled={!curRisk} onClick={handleAddAllergen}>
+                  Add
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="sec">What Else Should We Know?</div>
+          <textarea
+            className="nta"
+            placeholder="Example: severe if exposed to shared fryer oil, no cheese garnish."
+            value={allergyNotes}
+            onChange={(e) => setAllergyNotes(e.target.value)}
+          />
+
+          <button
+            className="sbtn"
+            onClick={handleNotifyStaff}
+            style={shakeSubmit ? {animation: 'shake 0.5s'} : {}}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            Notify Staff
+          </button>
+          {showHint && <div className="hint">Please add at least one allergy</div>}
+        </div>
+      </div>
+    )
   }
 
   if (screen === 'alwait') {
-    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Allergy Wait Screen — Phase 2</div></div>
+    return (
+      <div className="sc" style={{position:'relative'}}>
+        <div className="close-x" onClick={() => go('main')}>
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </div>
+        <div className="ob">
+          <div className="wi">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+          <div className="ot" style={{color:'#f59e0b'}}>
+            {decl.length === 1 ? 'Allergy Sent' : 'Allergies Sent'}
+          </div>
+          <div className="os">Your server has been notified.</div>
+          <div style={{display:'flex',alignItems:'center',gap:'10px',color:'var(--t1)',fontSize:'14px',fontWeight:500,marginTop:'20px'}}>
+            <div className="spinner" /> Waiting for confirmation...
+          </div>
+          <button onClick={() => go('alack')} style={{marginTop:'20px',padding:'10px 20px',background:'none',border:'1px solid var(--b)',borderRadius:'10px',color:'var(--t1)',fontSize:'13px',cursor:'pointer'}}>
+            Demo: simulate acknowledgment →
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (screen === 'alack') {
-    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Profile Screen — Phase 2</div></div>
+    return (
+      <div className="sc" style={{position:'relative'}}>
+        <div className="close-x" onClick={() => go('main')}>
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </div>
+        <div className="ob">
+          <div style={{width:'68px',height:'68px',background:'rgba(245,158,11,.08)',border:'2px solid #f59e0b',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'18px',boxShadow:'0 0 30px rgba(245,158,11,.2)'}}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              <polyline points="20 6 9 17 4 12" stroke="#f59e0b" strokeWidth="1.5" style={{transform:'translate(2px, 2px)'}}/>
+            </svg>
+          </div>
+          <div className="ot" style={{color:'#f59e0b'}}>You're All Set</div>
+          <div className="os">Your server and kitchen have been notified.</div>
+
+          <div style={{width:'60px',height:'1px',background:'var(--b)',margin:'28px 0'}} />
+
+          <div style={{background:'var(--s1)',border:'1px solid var(--b)',borderRadius:'18px',padding:'28px 24px',maxWidth:'320px',width:'100%'}}>
+            <div style={{textAlign:'center',marginBottom:'8px'}}>
+              <svg width="140" height="40" viewBox="0 0 140 40" fill="none">
+                <circle cx="20" cy="20" r="18" fill="#22d3ee" fillOpacity="0.12"/>
+                <path d="M12 20h8m0 0v-8m0 8v8" stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round"/>
+                <path d="M45 15v10m0-10h-6v10h6m0-10h6m-6 5h4" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M62 20c0-2.76 2.24-5 5-5s5 2.24 5 5-2.24 5-5 5-5-2.24-5-5z" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
+                <path d="M77 15c2.76 0 5 2.24 5 5s-2.24 5-5 5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
+                <path d="M90 15v10m0-5h6m-6 0c0-2.76 2.24-5 5-5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
+                <path d="M105 15v10m0-8.5c2.76 0 5 2.24 5 5v3.5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div style={{color:'#f59e0b',fontSize:'15px',fontWeight:600,marginBottom:'18px',textAlign:'center'}}>
+              Your allergy details, anywhere.
+            </div>
+            <div style={{color:'var(--t1)',fontSize:'14px',lineHeight:1.6,maxWidth:'260px',margin:'0 auto 24px',fontWeight:500,textAlign:'center'}}>
+              One tap to share at any venue.<br/>You're always in control.
+            </div>
+            <button className="pb" style={{width:'100%'}}>Create Free Profile</button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (screen === 'urgent') {
