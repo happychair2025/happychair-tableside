@@ -8,11 +8,19 @@ import type {
   AllergenSeverity,
 } from './types'
 
-type Screen = 'loading' | 'error' | 'main' | 'allergen' | 'sentiment' | 'success'
+type Screen = 'loading' | 'error' | 'main' | 'allergen' | 'sentiment' | 'success' | 'happy' | 'okay' | 'sad' | 'resolve' | 'allergy' | 'alwait' | 'alack' | 'urgent'
+
+type ButtonState = 'default' | 'pending' | 'accepted'
+
+interface ServiceButtonState {
+  state: ButtonState
+  timestamp: number
+}
 
 function App() {
   const [screen, setScreen] = useState<Screen>('loading')
   const [venue, setVenue] = useState<Venue | null>(null)
+  // @ts-expect-error - asset will be used in production mode
   const [asset, setAsset] = useState<Asset | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [sentimentScore, setSentimentScore] = useState<SentimentScore | null>(null)
@@ -25,8 +33,22 @@ function App() {
   const [cooldowns, setCooldowns] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
 
+  const [curVenue, setCurVenue] = useState('dining')
+  const [buttonStates, setButtonStates] = useState<Record<string, ServiceButtonState>>({})
+  const [elapsedTimes, setElapsedTimes] = useState<Record<string, number>>({})
+
   const venueId = new URLSearchParams(window.location.search).get('venue')
   const assetId = new URLSearchParams(window.location.search).get('table')
+
+  const VENUES: Record<string, {n:string,t:string,b:string[],ic:string[],q:string|null,f:string[]|null}> = {
+    dining: {n:'Happy Bistro',t:'T1 · Dining Room',b:['Request Check','Refill Water','Get Server','Clear Plates'],ic:['ck','wa','be','cl'],q:"How's Everything?",f:["I'm Happy",'It Was Okay','Disappointed']},
+    bar: {n:'The Copper Rail',t:'B4 · Main Bar',b:['Tab Please','Another Round','Call Bartender','Napkins'],ic:['tab','drink','user','napkin'],q:"How's Your Drink?",f:['Loved It','It Was Okay','Disappointed']},
+    hotel: {n:'The Grand Hotel',t:'Room 304',b:['Room Service','Housekeeping','Concierge','Maintenance'],ic:['room','broom','conc','wrench'],q:"How's Your Stay?",f:['Excellent','It Was Okay','Disappointed']},
+    pool: {n:'Azure Beach Club',t:'Lounger L12 · Pool',b:['Towel Service','Drink Order','Food Order','Call Attendant'],ic:['towel','drink','food','user'],q:'Enjoying Your Day?',f:['Loving It','It Was Okay','Disappointed']},
+    stadium: {n:'City Arena',t:'Sec 114 · Row K · Seat 23',b:['Food Order','Drink Order','Assistance','Report Issue'],ic:['food','drink','user','flag'],q:null,f:null}
+  }
+
+  const go = (id: string) => setScreen(id as Screen)
 
   useEffect(() => {
     if (!venueId || !assetId) {
@@ -73,6 +95,54 @@ function App() {
     loadData()
   }, [venueId, assetId])
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsedTimes(prev => {
+        const next = { ...prev }
+        Object.keys(buttonStates).forEach(key => {
+          if (buttonStates[key].state === 'pending') {
+            next[key] = Math.floor((Date.now() - buttonStates[key].timestamp) / 1000)
+          }
+        })
+        return next
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [buttonStates])
+
+  const updateButtonState = (key: string, state: ButtonState) => {
+    setButtonStates(prev => ({
+      ...prev,
+      [key]: { state, timestamp: Date.now() }
+    }))
+
+    if (state === 'pending') {
+      const acceptDelay = 3000 + Math.random() * 4000
+      setTimeout(() => {
+        setButtonStates(prev => {
+          if (prev[key]?.state === 'pending') {
+            return { ...prev, [key]: { state: 'accepted', timestamp: Date.now() } }
+          }
+          return prev
+        })
+
+        const completeDelay = 8000 + Math.random() * 7000
+        setTimeout(() => {
+          setButtonStates(prev => {
+            const next = { ...prev }
+            delete next[key]
+            return next
+          })
+          setElapsedTimes(prev => {
+            const next = { ...prev }
+            delete next[key]
+            return next
+          })
+        }, completeDelay)
+      }, acceptDelay)
+    }
+  }
+
   const isCoolingDown = (key: string) => !!cooldowns[key]
 
   const startCooldown = (key: string) => {
@@ -89,6 +159,7 @@ function App() {
   const handleRequestCheck = async () => {
     if (isCoolingDown('check')) return
     startCooldown('check')
+    updateButtonState('btn0', 'pending')
     if (!venueId || !assetId) return
 
     setSubmitError('')
@@ -103,14 +174,12 @@ function App() {
       setSubmitError('Failed to send request. Please try again.')
       return
     }
-
-    setScreen('success')
-    setTimeout(() => setScreen('main'), 3000)
   }
 
   const handleRequestWater = async () => {
     if (isCoolingDown('water')) return
     startCooldown('water')
+    updateButtonState('btn1', 'pending')
     if (!venueId || !assetId) return
 
     setSubmitError('')
@@ -125,14 +194,12 @@ function App() {
       setSubmitError('Failed to send request. Please try again.')
       return
     }
-
-    setScreen('success')
-    setTimeout(() => setScreen('main'), 3000)
   }
 
   const handleRequestServer = async () => {
     if (isCoolingDown('server')) return
     startCooldown('server')
+    updateButtonState('btn2', 'pending')
     if (!venueId || !assetId) return
 
     setSubmitError('')
@@ -147,14 +214,12 @@ function App() {
       setSubmitError('Failed to send request. Please try again.')
       return
     }
-
-    setScreen('success')
-    setTimeout(() => setScreen('main'), 3000)
   }
 
   const handleRequestPlates = async () => {
     if (isCoolingDown('plates')) return
     startCooldown('plates')
+    updateButtonState('btn3', 'pending')
     if (!venueId || !assetId) return
 
     setSubmitError('')
@@ -169,11 +234,9 @@ function App() {
       setSubmitError('Failed to send request. Please try again.')
       return
     }
-
-    setScreen('success')
-    setTimeout(() => setScreen('main'), 3000)
   }
 
+  // @ts-expect-error - handleServiceRequest will be used in future phases
   const handleServiceRequest = async (category: RequestCategory) => {
     if (!venueId || !assetId) return
 
@@ -349,139 +412,134 @@ function App() {
     )
   }
 
-  if (screen === 'main') {
-    return (
-      <div className="hc-card">
-        {venue?.logo_url ? (
-          <div
-            style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '16px',
-              background: '#1a2535',
-              border: '1px solid #1e2d3d',
-              margin: '0 auto 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '8px',
-            }}
-          >
-            <img
-              src={venue.logo_url}
-              alt={venue.name}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-              }}
-            />
+  const getIcon = (ic: string): React.ReactElement => {
+    const icons: Record<string, React.ReactElement> = {
+      ck: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
+      wa: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>,
+      be: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+      cl: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>,
+      tab: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+      drink: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>,
+      user: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+      napkin: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>,
+      room: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+      broom: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20"/><path d="M8 6h8"/><path d="M8 10h8"/><path d="M8 14h8"/></svg>,
+      conc: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+      wrench: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
+      towel: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>,
+      food: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+      flag: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+    }
+    return icons[ic] || icons.user
+  }
+
+  const renderServiceButton = (idx: number, label: string, ic: string, handler: () => void) => {
+    const btnKey = `btn${idx}`
+    const state = buttonStates[btnKey]?.state || 'default'
+    const elapsed = elapsedTimes[btnKey] || 0
+
+    const stateClass = state === 'pending' ? 'pending' : state === 'accepted' ? 'accepted' : ''
+
+    let statusContent = null
+    if (state === 'pending') {
+      statusContent = (
+        <>
+          <div className="spinner" />
+          Requested · {elapsed}s
+        </>
+      )
+    } else if (state === 'accepted') {
+      statusContent = (
+        <>
+          <div className="ck">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
-        ) : (
-          <>
-            <div
-              style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '16px',
-                background: '#22d3ee',
-                margin: '0 auto 16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '32px',
-                fontWeight: '800',
-                color: 'white',
-              }}
-            >
-              {venue?.name?.charAt(0).toUpperCase()}
+          Accepted · On the Way
+        </>
+      )
+    }
+
+    return (
+      <button className={`sb ${stateClass}`} onClick={handler} disabled={state !== 'default'}>
+        <div>{getIcon(ic)}</div>
+        <span className="sb-l">{label}</span>
+        {statusContent && <div className="sb-st">{statusContent}</div>}
+      </button>
+    )
+  }
+
+  if (screen === 'main') {
+    const v = VENUES[curVenue]
+    const handlers = [handleRequestCheck, handleRequestWater, handleRequestServer, handleRequestPlates]
+
+    return (
+      <>
+        <div className="vsw">
+          {[
+            { id: 'dining', label: '🍽 Restaurant' },
+            { id: 'bar', label: '🍺 Bar' },
+            { id: 'hotel', label: '🏨 Hotel' },
+            { id: 'pool', label: '🏊 Pool' },
+            { id: 'stadium', label: '🏟 Stadium' }
+          ].map(vt => (
+            <button key={vt.id} className={`vb ${curVenue === vt.id ? 'on' : ''}`} onClick={() => setCurVenue(vt.id)}>
+              {vt.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="card">
+          <div className="ci-wrap">
+            <div className="ci" style={{background:'rgba(239,68,68,.06)',borderColor:'rgba(239,68,68,.35)'}} onClick={() => go('urgent')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 18a5 5 0 0 0-10 0"/>
+                <line x1="12" y1="2" x2="12" y2="9"/>
+                <path d="M4.93 4.93l4.24 4.24"/>
+                <path d="M19.07 4.93l-4.24 4.24"/>
+              </svg>
             </div>
-            <h1 className="hc-venue-name">{venue?.name}</h1>
-          </>
-        )}
+          </div>
 
-        <div className="hc-table-label">Table {asset?.label}</div>
+          <div className="vh">
+            <div className="ib">{v.n.charAt(0)}</div>
+            <div className="vn">{v.n}</div>
+            <div className="vt">{v.t}</div>
+          </div>
 
-        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px'}}>
-          <button
-            className="hc-btn hc-btn-primary"
-            onClick={handleRequestCheck}
-            style={isCoolingDown('check') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Request Check
-          </button>
-          <button
-            className="hc-btn hc-btn-primary"
-            onClick={handleRequestWater}
-            style={isCoolingDown('water') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
-            Refill Water
-          </button>
-          <button
-            className="hc-btn hc-btn-primary"
-            onClick={handleRequestServer}
-            style={isCoolingDown('server') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            Call Server
-          </button>
-          <button
-            className="hc-btn hc-btn-primary"
-            onClick={handleRequestPlates}
-            style={isCoolingDown('plates') ? {opacity: 0.6, pointerEvents: 'none'} : {}}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
-            Clear Plates
-          </button>
+          <div className="bg">
+            {v.b.map((label, i) => renderServiceButton(i, label, v.ic[i], handlers[i]))}
+          </div>
+
+          <div className="esc">
+            <button className="eb" onClick={() => go('allergy')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+              Food Allergy
+            </button>
+          </div>
+
+          {v.q && v.f && (
+            <div className="sent">
+              <div className="sent-q">{v.q}</div>
+              <div className="sr">
+                <button className="fx pos" onClick={() => { submitSentiment(3); go('happy'); }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                  <span className="fx-t">{v.f[0]}</span>
+                </button>
+                <button className="fx neu" onClick={() => { submitSentiment(2); go('okay'); }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="15" x2="16" y2="15"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                  <span className="fx-t">{v.f[1]}</span>
+                </button>
+                <button className="fx neg" onClick={() => { submitSentiment(1); go('sad'); }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                  <span className="fx-t">{v.f[2]}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-
-        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px'}}>
-          <button
-            className="hc-btn hc-btn-allergen"
-            onClick={() => handleServiceRequest('allergen')}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            Food Allergies
-          </button>
-
-          <button
-            className="hc-btn hc-btn-danger"
-            onClick={() => handleServiceRequest('critical')}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            Get Help
-          </button>
-        </div>
-
-        {submitError && <div className="hc-error">{submitError}</div>}
-
-        <div className="hc-sentiment-label">How's everything?</div>
-        <div className="hc-sentiment-row">
-          <button
-            className="hc-face hc-face-positive"
-            onClick={() => submitSentiment(3)}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-            <span style={{fontSize: '11px', marginTop: '4px', color: 'white'}}>I'm Happy</span>
-          </button>
-          <button
-            className="hc-face hc-face-neutral"
-            onClick={() => submitSentiment(2)}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 15h8"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-            <span style={{fontSize: '11px', marginTop: '4px', color: 'white'}}>It was okay</span>
-          </button>
-          <button
-            className="hc-face hc-face-negative"
-            onClick={() => submitSentiment(1)}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-            <span style={{fontSize: '11px', marginTop: '4px', color: 'white'}}>Disappointed</span>
-          </button>
-        </div>
-      </div>
+      </>
     )
   }
 
@@ -642,6 +700,38 @@ function App() {
         </div>
       </div>
     )
+  }
+
+  if (screen === 'happy') {
+    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Happy Screen — Phase 2</div></div>
+  }
+
+  if (screen === 'okay') {
+    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Okay Screen — Phase 2</div></div>
+  }
+
+  if (screen === 'sad') {
+    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Sad Screen — Phase 2</div></div>
+  }
+
+  if (screen === 'resolve') {
+    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Resolved Screen — Phase 2</div></div>
+  }
+
+  if (screen === 'allergy') {
+    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Allergy Screen — Phase 2</div></div>
+  }
+
+  if (screen === 'alwait') {
+    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Allergy Wait Screen — Phase 2</div></div>
+  }
+
+  if (screen === 'alack') {
+    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Profile Screen — Phase 2</div></div>
+  }
+
+  if (screen === 'urgent') {
+    return <div className="sc on"><div className="ob" style={{color:'var(--t1)'}}>Urgent Screen — Phase 2</div></div>
   }
 
   return null
