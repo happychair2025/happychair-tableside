@@ -448,8 +448,8 @@ H+='<div class="sc" id="s-alname"><div class="close-x" onclick="go(\'main\')"><s
   H+='<div class="ot" style="color:#f59e0b">What&#39;s Your Name?</div>';
   H+='<div class="os">So we can get this right for you.</div>';
   H+='<div style="max-width:300px;width:100%;margin:20px auto 0">';
-  H+='<input id="fnameInput" type="text" maxlength="30" placeholder="First Name" autocomplete="given-name" style="width:100%;padding:14px 16px;background:var(--s1);border:1px solid var(--b);border-radius:12px;color:var(--t1);font-size:16px;font-family:inherit;font-weight:500;outline:none;transition:.15s;text-align:center;margin-bottom:10px"/>';
-  H+='<input id="lnameInput" type="text" maxlength="30" placeholder="Last Name" autocomplete="family-name" style="width:100%;padding:14px 16px;background:var(--s1);border:1px solid var(--b);border-radius:12px;color:var(--t1);font-size:16px;font-family:inherit;font-weight:500;outline:none;transition:.15s;text-align:center;margin-bottom:16px"/>';
+  H+='<input id="fnameInput" type="text" maxlength="30" placeholder="First Name" autocomplete="off" style="width:100%;padding:14px 16px;background:var(--s1);border:1px solid var(--b);border-radius:12px;color:var(--t1);font-size:16px;font-family:inherit;font-weight:500;outline:none;transition:.15s;text-align:center;margin-bottom:10px"/>';
+  H+='<input id="lnameInput" type="text" maxlength="30" placeholder="Last Name" autocomplete="off" style="width:100%;padding:14px 16px;background:var(--s1);border:1px solid var(--b);border-radius:12px;color:var(--t1);font-size:16px;font-family:inherit;font-weight:500;outline:none;transition:.15s;text-align:center;margin-bottom:16px"/>';
   H+='<button id="nameContBtn" onclick="saveNameAndContinue()" style="width:100%;padding:14px;background:#f59e0b;border:none;border-radius:12px;color:var(--bg);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s;opacity:1;pointer-events:auto">Continue ></button>';
   H+='</div></div></div>';
   H+='<div class="sc" id="s-allergy" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="scr" style="padding-top:14px"><div style="text-align:center;margin-bottom:6px"><div style="width:56px;height:56px;background:rgba(245,158,11,.08);border:2px solid #f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="pt" style="justify-content:center">Tell Us About Your Allergies</div></div><div class="ps">Select any allergies or add your own.</div><div id="declList" class="dl"></div><div class="sec">Search Allergies</div><div class="srw"><svg class="sri" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="srb" id="searchIn" type="text" placeholder="Search — butter, fish stock, gluten..." maxlength="60" autocomplete="off"><div class="srl" id="searchRes"></div></div><div class="sec">Select Common Allergies</div><div class="chips" id="chipBar"></div><div id="cfgPanel"></div><div class="sec">What Else Should We Know?</div><textarea class="nta" placeholder="Example: severe if exposed to shared fryer oil, no cheese garnish"></textarea><button class="sbtn" id="submitBtn" onclick="trySubmit()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span id="submitLbl">Notify Staff</span></button></div></div>';
@@ -591,14 +591,21 @@ function saveNameAndContinue(){
   var ln=document.getElementById('lnameInput');
   var first=fn?fn.value.trim():'';
   var last=ln?ln.value.trim():'';
+  var valid=true;
   if(!first){
     fn.style.borderColor='var(--danger)';
     fn.setAttribute('placeholder','First Name Required');
-    fn.style.setProperty('--ph-color','var(--danger)');
     setTimeout(function(){fn.style.borderColor='var(--b)';fn.setAttribute('placeholder','First Name')},2000);
-    return;
+    valid=false;
   }
-  guestName=first+(last?' '+last:'');
+  if(!last){
+    ln.style.borderColor='var(--danger)';
+    ln.setAttribute('placeholder','Last Name Required');
+    setTimeout(function(){ln.style.borderColor='var(--b)';ln.setAttribute('placeholder','Last Name')},2000);
+    valid=false;
+  }
+  if(!valid)return;
+  guestName=first+' '+last;
   go('allergy');
 }
 
