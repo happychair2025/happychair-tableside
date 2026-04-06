@@ -209,6 +209,12 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 
 #sadTxt:focus{border-color:var(--danger) !important}
 #okTxt:focus{border-color:#f59e0b !important}
+
+.field-error::placeholder{color:var(--danger) !important;opacity:.7}
+.field-error::-webkit-input-placeholder{color:var(--danger) !important;opacity:.7}
+
+#fnameInput::-webkit-search-cancel-button,#lnameInput::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
+#fnameInput::-ms-clear,#lnameInput::-ms-clear{display:none}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -448,11 +454,11 @@ H+='<div class="sc" id="s-alname"><div class="close-x" onclick="go(\'main\')"><s
   H+='<div class="ot" style="color:#f59e0b">What&#39;s Your Name?</div>';
   H+='<div class="os">So we can get this right for you.</div>';
   H+='<div style="max-width:300px;width:100%;margin:20px auto 0">';
-  H+='<input id="fnameInput" type="text" maxlength="30" placeholder="First Name" autocomplete="nope" data-lpignore="true" style="width:100%;padding:14px 16px;background:var(--s1);border:1px solid var(--b);border-radius:12px;color:var(--t1);font-size:16px;font-family:inherit;font-weight:500;outline:none;transition:.15s;text-align:center;margin-bottom:10px"/>';
-  H+='<input id="lnameInput" type="text" maxlength="30" placeholder="Last Name" autocomplete="nope" data-lpignore="true" style="width:100%;padding:14px 16px;background:var(--s1);border:1px solid var(--b);border-radius:12px;color:var(--t1);font-size:16px;font-family:inherit;font-weight:500;outline:none;transition:.15s;text-align:center;margin-bottom:16px"/>';
+  H+='<input id="fnameInput" type="search" maxlength="30" placeholder="First Name" style="width:100%;padding:14px 16px;background:var(--s1);border:1px solid var(--b);border-radius:12px;color:var(--t1);font-size:16px;font-family:inherit;font-weight:500;outline:none;transition:.15s;text-align:center;margin-bottom:10px"/>';
+  H+='<input id="lnameInput" type="search" maxlength="30" placeholder="Last Name" style="width:100%;padding:14px 16px;background:var(--s1);border:1px solid var(--b);border-radius:12px;color:var(--t1);font-size:16px;font-family:inherit;font-weight:500;outline:none;transition:.15s;text-align:center;margin-bottom:16px"/>';
   H+='<button id="nameContBtn" onclick="saveNameAndContinue()" style="width:100%;padding:14px;background:#f59e0b;border:none;border-radius:12px;color:var(--bg);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s;opacity:1;pointer-events:auto">Continue ></button>';
   H+='</div></div></div>';
-  H+='<div class="sc" id="s-allergy" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="scr" style="padding-top:14px"><div style="text-align:center;margin-bottom:6px"><div style="width:56px;height:56px;background:rgba(245,158,11,.08);border:2px solid #f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="pt" style="justify-content:center">Tell Us About Your Allergies</div></div><div class="ps">Select any allergies or add your own.</div><div id="declList" class="dl"></div><div class="sec">Search Allergies</div><div class="srw"><svg class="sri" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="srb" id="searchIn" type="text" placeholder="Search — butter, fish stock, gluten..." maxlength="60" autocomplete="nope" data-lpignore="true"><div class="srl" id="searchRes"></div></div><div class="sec">Select Common Allergies</div><div class="chips" id="chipBar"></div><div id="cfgPanel"></div><div class="sec">What Else Should We Know?</div><textarea class="nta" placeholder="Example: severe if exposed to shared fryer oil, no cheese garnish"></textarea><button class="sbtn" id="submitBtn" onclick="trySubmit()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span id="submitLbl">Notify Staff</span></button></div></div>';
+  H+='<div class="sc" id="s-allergy" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="scr" style="padding-top:14px"><div style="text-align:center;margin-bottom:6px"><div style="width:56px;height:56px;background:rgba(245,158,11,.08);border:2px solid #f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="pt" style="justify-content:center">Tell Us About Your Allergies</div></div><div class="ps">Select any allergies or add your own.</div><div id="declList" class="dl"></div><div class="sec">Search Allergies</div><div class="srw"><svg class="sri" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="srb" id="searchIn" type="text" placeholder="Search — butter, fish stock, gluten..." maxlength="60"><div class="srl" id="searchRes"></div></div><div class="sec">Select Common Allergies</div><div class="chips" id="chipBar"></div><div id="cfgPanel"></div><div class="sec">What Else Should We Know?</div><textarea class="nta" placeholder="Example: severe if exposed to shared fryer oil, no cheese garnish"></textarea><button class="sbtn" id="submitBtn" onclick="trySubmit()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span id="submitLbl">Notify Staff</span></button></div></div>';
 H+='<div class="sc" id="s-alwait" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob"><div class="wi"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="ot" style="color:#f59e0b" id="alwaitTitle">Allergy Sent</div><div class="os">Your server has been notified.</div><div style="margin-top:16px;display:flex;align-items:center;gap:10px;color:var(--t1);font-size:14px;font-weight:500"><div class="spinner"></div>Waiting for confirmation...</div></div><div style="padding:0 18px 18px"><button style="width:100%;padding:10px;background:none;border:1px solid var(--b);border-radius:10px;color:var(--t1);font-size:13px;cursor:pointer;font-family:inherit" onclick="go(\'alack\')">Demo: simulate acknowledgment →</button></div></div>';
 H+='<div class="sc" id="s-alack" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob">'
 +'<div style="width:68px;height:68px;background:rgba(245,158,11,.08);border:2px solid #f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:18px;box-shadow:0 0 30px rgba(245,158,11,.2);animation:pop .5s cubic-bezier(.34,1.56,.64,1)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></div>'
@@ -586,32 +592,43 @@ function toggleXC(){curXC=!curXC;buildConfig(true)}
 function addToDecl(){if(!curAllergen||!curRisk)return;decl.push({name:curAllergen,risk:curRisk,xc:curXC});curAllergen=null;document.getElementById('cfgPanel').innerHTML='';buildChips();buildDecl();
 if(venueId)loadVenueData();toast('Added ✓')}
 function removeDecl(i){decl.splice(i,1);buildChips();buildDecl()}
+function flagField(el,msg){
+  el.style.borderColor='var(--danger)';
+  el.style.background='rgba(239,68,68,.08)';
+  el.setAttribute('placeholder',msg);
+  el.classList.add('field-error');
+}
+
+function clearFlag(el,ph){
+  el.style.borderColor='var(--b)';
+  el.style.background='var(--s1)';
+  el.setAttribute('placeholder',ph);
+  el.classList.remove('field-error');
+}
+
 function saveNameAndContinue(){
   var fn=document.getElementById('fnameInput');
   var ln=document.getElementById('lnameInput');
   var first=fn?fn.value.trim():'';
   var last=ln?ln.value.trim():'';
-  var valid=true;
-  if(!first){
-    fn.style.borderColor='var(--danger)';
-    fn.style.background='rgba(239,68,68,.08)';
-    fn.setAttribute('placeholder','First Name Required');
-    setTimeout(function(){fn.style.borderColor='var(--b)';fn.style.background='var(--s1)';fn.setAttribute('placeholder','First Name')},2000);
-    valid=false;
-  }
-  if(!last){
-    ln.style.borderColor='var(--danger)';
-    ln.style.background='rgba(239,68,68,.08)';
-    ln.setAttribute('placeholder','Last Name Required');
-    setTimeout(function(){ln.style.borderColor='var(--b)';ln.style.background='var(--s1)';ln.setAttribute('placeholder','Last Name')},2000);
-    valid=false;
-  }
-  if(!valid)return;
+  if(!first)flagField(fn,'First Name Required');
+  if(!last)flagField(ln,'Last Name Required');
+  if(!first||!last)return;
   guestName=first+' '+last;
   go('allergy');
 }
 
 
+
+// Clear red error when user starts typing
+document.addEventListener('input',function(e){
+  if(e.target.id==='fnameInput'&&e.target.classList.contains('field-error')){
+    clearFlag(e.target,'First Name');
+  }
+  if(e.target.id==='lnameInput'&&e.target.classList.contains('field-error')){
+    clearFlag(e.target,'Last Name');
+  }
+});
 
 // Allow Enter key to proceed
 document.addEventListener('keydown',function(e){
