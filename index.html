@@ -28,7 +28,7 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 #app{height:calc(100vh - 36px);background:var(--bg);overflow:hidden;opacity:0;transition:opacity .5s .15s}
 #app.vis{opacity:1}
 .sc{display:none;flex-direction:column;height:100%;overflow:hidden}.sc.on{display:flex}
-.scr{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:20px}
+.scr{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:100px}
 
 /* ══ CARD ══ */
 .card{background:var(--s1);border:1px solid var(--b);border-radius:20px;margin:12px;padding:22px 18px 0;position:relative;animation:cardIn .4s cubic-bezier(.34,1.2,.64,1)}
@@ -246,8 +246,9 @@ async function insertAllergens(allergens, severity, notes) {
     guest_session_id: sessId,
     guest_name: guestName || null,
     status: 'pending'
-  }).select('id').single();
+  }).select().single();
   if(data && data.id) { lastDeclId = data.id; subscribeToAck(data.id); }
+  else { subscribeToAckFallback(sessId); }
 }
 
 // Subscribe to kitchen acknowledgment for this declaration
@@ -262,6 +263,22 @@ function subscribeToAck(declId) {
       var d = payload.new;
       if (d.kitchen_ack_at || d.server_ack_at) {
         // Kitchen or server acknowledged — transition guest to profile
+        go('alack');
+      }
+    })
+    .subscribe();
+}
+
+function subscribeToAckFallback(sessId) {
+  sb.channel('ack-fb-'+sessId)
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'allergen_declarations',
+      filter: 'guest_session_id=eq.'+sessId
+    }, function(payload) {
+      var d = payload.new;
+      if (d.kitchen_ack_at || d.server_ack_at) {
         go('alack');
       }
     })
@@ -412,7 +429,15 @@ H+='<div class="sc" id="s-happy" style="position:relative"><div class="close-x" 
 H+='<div class="sc" id="s-okay" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob" id="okayBody"><div class="of" style="filter:drop-shadow(0 0 24px rgba(245,158,11,.35))">'+face('warn',56)+'</div><div class="ot" style="color:#f59e0b">We Can Make This Better</div><div class="os">A server is coming by to help.</div><div class="ac" style="border-color:rgba(245,158,11,.25)"><div class="ac-t">What Can We Fix Right Now?</div><div class="ac-s">Share a quick note so we can help faster.</div><textarea class="ac-ta" id="okTxt" placeholder="What can we improve?"></textarea><button class="ac-btn" style="background:#f59e0b;color:var(--bg)" onclick="sendFeedback(\'okay\')">'+IC.snd+' Send to Server</button></div><button class="done-btn" onclick="go(\'main\')">Done</button></div></div>';
 H+='<div class="sc" id="s-sad" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob" id="sadBody"><div class="of" style="filter:drop-shadow(0 0 24px rgba(239,68,68,.35))">'+face('danger',56)+'</div><div class="ot" style="color:var(--danger)">We\'re Sorry. Let\'s Make This Right.</div><div class="os">A manager is on the way now.</div><div class="ac" style="border-color:rgba(239,68,68,.25)"><div class="ac-t">Tell Us What Happened</div><div class="ac-s">This helps us resolve it quickly.</div><textarea class="ac-ta" id="sadTxt" placeholder="What went wrong?"></textarea><button class="ac-btn" style="background:var(--danger);color:#fff" onclick="sendFeedback(\'sad\')">'+IC.snd+' Send to Manager</button></div><button class="done-btn" onclick="go(\'main\')">Done</button></div></div>';
 H+='<div class="sc" id="s-resolve" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob"><div class="of" style="filter:drop-shadow(0 0 24px rgba(34,211,238,.3))"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></div><div class="ot">Did We Make It Right?</div><div class="os">We hope your experience improved.</div><div class="rbtns"><button style="background:var(--cyan);color:var(--bg);border:none" onclick="go(\'happy\')">Yes, All Good</button><button style="background:transparent;color:var(--t1);border:1px solid var(--b)">Not Yet</button></div><button class="done-btn" onclick="go(\'main\')">Back to Menu</button></div></div>';
-H+='<div class="sc" id="s-alname"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob"><div style="width:56px;height:56px;background:rgba(245,158,11,.08);border:2px solid #f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:18px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="ot" style="color:#f59e0b">What\'s Your First Name?</div><div class="os">This helps the kitchen know exactly who to prepare for.</div><div style="max-width:300px;width:100%;margin:20px auto 0"><input id="nameInput" type="text" maxlength="30" placeholder="First name" autocomplete="given-name" style="width:100%;padding:14px 16px;background:var(--s2);border:1px solid var(--b);border-radius:12px;color:var(--t1);font-size:16px;font-family:inherit;font-weight:500;outline:none;transition:.15s;text-align:center" onfocus="this.style.borderColor=\'#f59e0b\'" onblur="this.style.borderColor=\'var(--b)\'" onkeydown="if(event.key===\'Enter\'){saveNameAndContinue()}"/><button onclick="saveNameAndContinue()" style="width:100%;margin-top:12px;padding:14px;background:#f59e0b;border:none;border-radius:12px;color:var(--bg);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s">Continue</button><button onclick="guestName=\'\';go(\'allergy\')" style="width:100%;margin-top:8px;padding:10px;background:none;border:none;color:var(--t2);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit">Skip</button></div></div></div>';
+H+='<div class="sc" id="s-alname"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob">';
+  H+='<div style="width:56px;height:56px;background:rgba(245,158,11,.08);border:2px solid #f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:18px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>';
+  H+='<div class="ot" style="color:#f59e0b">Who Are You?</div>';
+  H+='<div class="os">So the kitchen knows exactly who to prepare for.</div>';
+  H+='<div style="max-width:300px;width:100%;margin:20px auto 0">';
+  H+='<input id="fnameInput" type="text" maxlength="30" placeholder="First Name" autocomplete="given-name" style="width:100%;padding:14px 16px;background:var(--s2);border:1px solid var(--b);border-radius:12px;color:var(--t1);font-size:16px;font-family:inherit;font-weight:500;outline:none;transition:.15s;text-align:center;margin-bottom:10px" onfocus="this.style.borderColor=\'#f59e0b\'" onblur="this.style.borderColor=\'var(--b)\'"/>';
+  H+='<input id="lnameInput" type="text" maxlength="30" placeholder="Last Name" autocomplete="family-name" style="width:100%;padding:14px 16px;background:var(--s2);border:1px solid var(--b);border-radius:12px;color:var(--t1);font-size:16px;font-family:inherit;font-weight:500;outline:none;transition:.15s;text-align:center;margin-bottom:16px" onfocus="this.style.borderColor=\'#f59e0b\'" onblur="this.style.borderColor=\'var(--b)\'"/>';
+  H+='<button id="nameContBtn" onclick="saveNameAndContinue()" style="width:100%;padding:14px;background:#f59e0b;border:none;border-radius:12px;color:var(--bg);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s;opacity:.4;pointer-events:none">Continue</button>';
+  H+='</div></div></div>';
   H+='<div class="sc" id="s-allergy" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="scr" style="padding-top:14px"><div style="text-align:center;margin-bottom:6px"><div style="width:56px;height:56px;background:rgba(245,158,11,.08);border:2px solid #f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="pt" style="justify-content:center">Tell Us About Your Allergies</div></div><div class="ps">Select any allergies or add your own.</div><div id="declList" class="dl"></div><div class="sec">Search Allergies</div><div class="srw"><svg class="sri" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input class="srb" id="searchIn" type="text" placeholder="Search — butter, fish stock, gluten..." maxlength="60" autocomplete="off"><div class="srl" id="searchRes"></div></div><div class="sec">Select Common Allergies</div><div class="chips" id="chipBar"></div><div id="cfgPanel"></div><div class="sec">What Else Should We Know?</div><textarea class="nta" placeholder="Example: severe if exposed to shared fryer oil, no cheese garnish"></textarea><button class="sbtn" id="submitBtn" onclick="trySubmit()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span id="submitLbl">Notify Staff</span></button></div></div>';
 H+='<div class="sc" id="s-alwait" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob"><div class="wi"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="ot" style="color:#f59e0b" id="alwaitTitle">Allergy Sent</div><div class="os">Your server has been notified.</div><div style="margin-top:16px;display:flex;align-items:center;gap:10px;color:var(--t1);font-size:14px;font-weight:500"><div class="spinner"></div>Waiting for confirmation...</div></div><div style="padding:0 18px 18px"><button style="width:100%;padding:10px;background:none;border:1px solid var(--b);border-radius:10px;color:var(--t1);font-size:13px;cursor:pointer;font-family:inherit" onclick="go(\'alack\')">Demo: simulate acknowledgment →</button></div></div>';
 H+='<div class="sc" id="s-alack" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob">'
@@ -547,12 +572,36 @@ function addToDecl(){if(!curAllergen||!curRisk)return;decl.push({name:curAllerge
 if(venueId)loadVenueData();toast('Added ✓')}
 function removeDecl(i){decl.splice(i,1);buildChips();buildDecl()}
 function saveNameAndContinue(){
-  var inp=document.getElementById('nameInput');
-  guestName=inp?inp.value.trim():'';
+  var fn=document.getElementById('fnameInput');
+  var ln=document.getElementById('lnameInput');
+  var first=fn?fn.value.trim():'';
+  var last=ln?ln.value.trim():'';
+  if(!first)return;
+  guestName=first+(last?' '+last:'');
   go('allergy');
 }
 
-function trySubmit(){if(!decl.length){var sb=document.getElementById('submitBtn');sb.style.animation='shake .4s ease';setTimeout(function(){sb.style.animation=''},600);if(!document.getElementById('hintMsg')){var h=document.createElement('div');h.id='hintMsg';h.className='hint';h.textContent='Select at least one allergen above';sb.parentNode.insertBefore(h,sb)}return}document.getElementById('alwaitTitle').textContent=decl.length===1?'Allergy Sent':'Allergies Sent';go('alwait')}
+// Enable continue button when first name has text
+document.addEventListener('input',function(e){
+  if(e.target.id==='fnameInput'||e.target.id==='lnameInput'){
+    var fn=document.getElementById('fnameInput');
+    var btn=document.getElementById('nameContBtn');
+    if(fn&&btn){
+      var has=fn.value.trim().length>0;
+      btn.style.opacity=has?'1':'.4';
+      btn.style.pointerEvents=has?'auto':'none';
+    }
+  }
+});
+
+// Allow Enter key to proceed
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&(e.target.id==='fnameInput'||e.target.id==='lnameInput')){
+    saveNameAndContinue();
+  }
+});
+
+function trySubmit(){if(!decl.length){var sb=document.getElementById('submitBtn');sb.style.animation='shake .4s ease';setTimeout(function(){sb.style.animation=''},600);if(!document.getElementById('hintMsg')){var h=document.createElement('div');h.id='hintMsg';h.className='hint';h.textContent='Select at least one allergen above';sb.parentNode.insertBefore(h,sb)}return}document.getElementById('alwaitTitle').textContent=decl.length===1?'Allergy Sent':'Allergies Sent';go('alwait');setTimeout(function(){var ws=document.getElementById('s-alwait');if(ws&&ws.classList.contains('on')){go('alack')}},60000)}
 
 // Search
 function doSearch(){var v=document.getElementById('searchIn').value.trim().toLowerCase();var sr=document.getElementById('searchRes');if(v.length<1){sr.classList.remove('open');return}var added=decl.map(function(d){return d.name.toLowerCase()});var matches=ADB.filter(function(a){return a.n.toLowerCase().indexOf(v)>-1&&!added.includes(a.n.toLowerCase())}).slice(0,6);var html='';matches.forEach(function(m){html+='<div class="srl-i" onclick="pickSearch(\''+m.n+'\')"><span class="srl-n">'+m.n+'</span><span class="srl-c">'+m.c+'</span></div>'});var exact=ADB.some(function(a){return a.n.toLowerCase()===v});if(!exact&&v.length>1){var cap=v.charAt(0).toUpperCase()+v.slice(1);html+='<div class="srl-new" onclick="addCustom(\''+cap+'\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add \u201c'+cap+'\u201d as custom</div>'}if(!html)html='<div style="padding:11px 14px;font-size:13px;color:var(--t2)">No matches</div>';sr.innerHTML=html;sr.classList.add('open')}
