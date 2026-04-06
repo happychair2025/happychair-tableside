@@ -544,7 +544,7 @@ function buildConfig(noAnim){
 function setRisk(v){curRisk=v;buildConfig(true)}
 function toggleXC(){curXC=!curXC;buildConfig(true)}
 function addToDecl(){if(!curAllergen||!curRisk)return;decl.push({name:curAllergen,risk:curRisk,xc:curXC});curAllergen=null;document.getElementById('cfgPanel').innerHTML='';buildChips();buildDecl();
-if(venueId)loadVenueData();toast('Added to declaration ✓')}
+if(venueId)loadVenueData();toast('Added ✓')}
 function removeDecl(i){decl.splice(i,1);buildChips();buildDecl()}
 function saveNameAndContinue(){
   var inp=document.getElementById('nameInput');
