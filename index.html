@@ -148,7 +148,7 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 .rk[data-v=unsure].on{border-color:#94a3b8;background:rgba(148,163,184,.06)}
 .rk[data-v=discomfort].on{border-color:#22d3ee;background:rgba(34,211,238,.06)}
 .rk[data-v=severe].on{border-color:#f59e0b;background:rgba(245,158,11,.08)}
-.rk[data-v=anaphylaxis].on{border-color:#ef4444;background:rgba(239,68,68,.08)}
+.rk[data-v=anaphylaxis].on{border-color:#ef4444;background:rgba(239,68,68,.15)}
 .rk-n{font-size:13px;font-weight:700}.rk-d{color:var(--t2);font-size:12px;margin-top:3px}
 .ccr{display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--s1);border:1px solid var(--b);border-radius:10px;cursor:pointer;margin-bottom:14px;transition:.15s}
 .ccr:hover{border-color:var(--b2)}.ccr.on{border-color:#f59e0b;background:rgba(245,158,11,.06)}
@@ -210,13 +210,25 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 #sadTxt:focus{border-color:var(--danger) !important}
 #okTxt:focus{border-color:#f59e0b !important}
 
-.field-error::placeholder{color:var(--danger) !important;opacity:.7}
-.field-error::-webkit-input-placeholder{color:var(--danger) !important;opacity:.7}
+.field-error::placeholder{color:var(--danger) !important;opacity:1}
+.field-error::-webkit-input-placeholder{color:var(--danger) !important;opacity:1}
 
 #fnameInput::-webkit-search-cancel-button,#searchIn::-webkit-search-cancel-button,#lnameInput::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
 #fnameInput::-ms-clear,#searchIn::-ms-clear,#lnameInput::-ms-clear{display:none}
 
 #searchIn:-webkit-autofill{-webkit-box-shadow:0 0 0 30px #141d2b inset !important;-webkit-text-fill-color:#e2e8f0 !important}
+
+#s-alname button:focus-visible,#s-allergy button:focus-visible,#s-alwait button:focus-visible,#s-alack button:focus-visible{outline:none}
+
+#s-allergy .chip:hover{border-color:#f59e0b;background:rgba(245,158,11,.06)}
+#s-allergy .chip.on:hover{border-color:#f59e0b;background:rgba(245,158,11,.15)}
+#s-allergy .fx:hover{border-color:#f59e0b;transform:translateY(-2px)}
+#s-alname #nameContBtn:hover{filter:brightness(1.12);transform:translateY(-1px)}
+#s-alname #nameContBtn:active{transform:translateY(0);filter:brightness(.95)}
+#s-allergy #submitBtn:hover{filter:brightness(1.12);transform:translateY(-1px)}
+#s-allergy #submitBtn:active{transform:translateY(0);filter:brightness(.95)}
+.eb:hover{background:rgba(245,158,11,.12);border-color:#f59e0b !important;transform:translateY(-1px)}
+.eb:active{transform:translateY(0);background:rgba(245,158,11,.18)}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -556,7 +568,7 @@ function sendFeedback(type){
   var body=document.getElementById(type==='okay'?'okayBody':'sadBody');
   var who=type==='okay'?'Your server':'A manager';
   var col=type==='okay'?'#f59e0b':'var(--danger)';
-  var bg2=type==='okay'?'rgba(245,158,11,.08)':'rgba(239,68,68,.08)';
+  var bg2=type==='okay'?'rgba(245,158,11,.08)':'rgba(239,68,68,.15)';
   var now=Date.now();var aDel=3000+Math.random()*4000;var rDel=aDel+5000+Math.random()*5000;
   body.innerHTML='<div class="ob"><div style="width:56px;height:56px;border-radius:50%;background:'+bg2+';border:2px solid '+col+';display:flex;align-items:center;justify-content:center;margin-bottom:14px;animation:pop .4s ease"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div><div class="ot" style="color:'+col+'">'+(type==='okay'?'Sent to your server':'Sent to manager')+'</div><div class="os">'+who+' has been notified</div>'+(msg?'<div style="background:var(--s2);border:1px solid var(--b);border-radius:10px;padding:14px;margin-top:12px;font-size:13px;font-style:italic;max-width:300px">"'+msg+'"</div>':'')+'<div class="tst"><div class="tsr" style="animation:up .3s .1s both"><div class="td done"></div><div class="tl">Submitted</div><div class="tt done">'+fmtClock(new Date())+'</div></div><div class="tsr" style="animation:up .3s .2s both"><div class="td prog" id="d2'+type+'"></div><div class="tl">'+(type==='okay'?'Server acknowledged':'Manager acknowledged')+'</div><div class="tt prog" id="t2'+type+'">waiting…</div></div><div class="tsr" style="animation:up .3s .3s both"><div class="td wait" id="d3'+type+'"></div><div class="tl">Resolved</div><div class="tt wait" id="t3'+type+'">—</div></div></div><button class="done-btn" style="margin-top:18px" onclick="go(\'main\')">Done</button></div>';
   setTimeout(function(){var d=document.getElementById('d2'+type);var t=document.getElementById('t2'+type);if(d){d.className='td done'}if(t){t.className='tt done';t.textContent=fmtClock(new Date())}var d3=document.getElementById('d3'+type);if(d3)d3.className='td prog';var t3=document.getElementById('t3'+type);if(t3){t3.className='tt prog';t3.textContent='in progress…'}},aDel);
@@ -596,7 +608,7 @@ if(venueId)loadVenueData();toast('Added ✓')}
 function removeDecl(i){decl.splice(i,1);buildChips();buildDecl()}
 function flagField(el,msg){
   el.style.borderColor='var(--danger)';
-  el.style.background='rgba(239,68,68,.08)';
+  el.style.background='rgba(239,68,68,.15)';
   el.setAttribute('placeholder',msg);
   el.classList.add('field-error');
 }
