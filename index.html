@@ -42,7 +42,7 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 .ci svg{width:18px;height:18px}
 .ci-badge{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;border-radius:50%;background:#f59e0b;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--bg);padding:0 4px;transition:.3s}
 .ci-badge.ok{background:var(--ok)}.ci-badge.hide{display:none}
-.hand{display:inline-flex;transform-origin:bottom center}.ci:hover .hand{animation:wave .35s ease}
+.hand{display:inline-flex;transform-origin:bottom center}.ci:hover .hand{animation:wave .4s ease}
 
 /* ══ SERVICE BUTTONS ══ */
 .bg{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:9px}
@@ -55,7 +55,7 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 .sb.pending svg{stroke:#f59e0b}.sb.pending .sb-l,.sb.pending .sb-st{color:#f59e0b}
 .sb.accepted{border-color:rgba(16,185,129,.5);background:rgba(16,185,129,.04)}
 .sb.accepted svg{stroke:var(--ok)}.sb.accepted .sb-l,.sb.accepted .sb-st{color:var(--ok)}
-.bell{transform-origin:top center}.sb:hover .bell{animation:jingle .6s ease}
+.bell{transform-origin:top center}.sb:hover .bell{animation:jingle .4s ease}
 .spinner{width:10px;height:10px;border:1.5px solid rgba(245,158,11,.3);border-top-color:#f59e0b;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
 .ck{width:12px;height:12px;border-radius:50%;background:var(--ok);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 
@@ -204,7 +204,7 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 @keyframes shake{0%,100%{transform:translateX(0)}15%{transform:translateX(-5px)}30%{transform:translateX(5px)}45%{transform:translateX(-4px)}60%{transform:translateX(4px)}75%{transform:translateX(-2px)}90%{transform:translateX(2px)}}
 ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b);border-radius:3px}
 .bell svg{transform-origin:top center}
-.sb:hover .bell svg{animation:jingle .7s ease both}
+.sb:hover .bell svg{animation:jingle .4s ease both}
 
 .inp-x{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:50%;background:var(--s2);display:none;align-items:center;justify-content:center;cursor:pointer;color:var(--t2);transition:.15s}
 .field-error::placeholder{color:var(--danger) !important;opacity:1}.field-error::-webkit-input-placeholder{color:var(--danger) !important;opacity:1}
@@ -490,8 +490,8 @@ H+='<div class="sc" id="s-alack" style="position:relative"><div class="close-x" 
 
 +'</div>'
 +'</div></div>';
-H+='<div class="sc" id="s-urgent" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob"><div class="alert-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg></div><div class="ot" style="color:var(--danger)">Emergency Help</div><div class="os" style="font-weight:500">Staff Will Be Alerted Immediately.</div><div style="max-width:320px;width:100%;margin:24px auto 0"><div style="position:relative;margin-bottom:8px"><button class="hld" style="background:var(--danger);color:#fff" onmousedown="startHold()" onmouseup="endHold()" onmouseleave="endHold()" ontouchstart="startHold()" ontouchend="endHold()" ontouchcancel="endHold()"><div class="hld-fill" id="holdFill"></div><span style="position:relative;z-index:1" id="holdLabel">Hold for Emergency</span></button><div class="hld-progress"><div class="hld-bar" id="holdBar"></div></div></div></div></div></div>';
-H+='<div class="sc" id="s-emsuccess" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob"><div style="width:72px;height:72px;border-radius:50%;background:rgba(239,68,68,.1);border:2px solid var(--danger);display:flex;align-items:center;justify-content:center;margin-bottom:18px;position:relative"><div style="position:absolute;width:72px;height:72px;border-radius:50%;border:2px solid rgba(239,68,68,.3);animation:emRing 2s ease infinite"></div><div style="position:absolute;width:72px;height:72px;border-radius:50%;border:2px solid rgba(239,68,68,.3);animation:emRing 2s .7s ease infinite"></div><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div><div class="ot" style="color:var(--danger)">Help Is On The Way</div><div class="os" style="font-weight:500">Staff Has Been Alerted. Stay Where You Are.</div><button class="done-btn" style="margin-top:24px" onclick="go(\'main\')">Done</button></div></div>';
+H+='<div class="sc" id="s-urgent" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob"><div class="alert-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg></div><div class="ot" style="color:var(--danger)">Emergency Help</div><div class="os" style="font-weight:500">Staff will be alerted immediately.</div><div style="max-width:320px;width:100%;margin:24px auto 0"><div style="position:relative;margin-bottom:8px"><button class="hld" style="background:var(--danger);color:#fff" onmousedown="startHold()" onmouseup="endHold()" onmouseleave="endHold()" ontouchstart="startHold()" ontouchend="endHold()" ontouchcancel="endHold()"><div class="hld-fill" id="holdFill"></div><span style="position:relative;z-index:1" id="holdLabel">Hold for Emergency</span></button></div></div></div></div>';
+H+='<div class="sc" id="s-emsuccess" style="position:relative"><div class="close-x" onclick="go(\'main\')"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div class="ob"><div style="width:72px;height:72px;border-radius:50%;background:rgba(239,68,68,.1);border:2px solid var(--danger);display:flex;align-items:center;justify-content:center;margin-bottom:18px;position:relative"><div style="position:absolute;width:72px;height:72px;border-radius:50%;border:2px solid rgba(239,68,68,.3);animation:emRing 2s ease infinite"></div><div style="position:absolute;width:72px;height:72px;border-radius:50%;border:2px solid rgba(239,68,68,.3);animation:emRing 2s .7s ease infinite"></div><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div><div class="ot" style="color:var(--danger)">Help Is On The Way</div><div class="os" style="font-weight:500">Staff has been alerted. Stay where you are.</div><button class="done-btn" style="margin-top:24px" onclick="go(\'main\')">Done</button></div></div>';
 document.getElementById('app').innerHTML=H;
 
 // ══════════════════════════════════════════════════════════════
@@ -681,8 +681,8 @@ function closeSearch(){document.getElementById('searchRes').classList.remove('op
 // ══════════════════════════════════════════════════════════════
 var holdRAF=null,holdStart=0;
 
-function startHold(){holdStart=Date.now();var f=document.getElementById('holdFill');var bar=document.getElementById('holdBar');if(!f)return;f.style.transition='none';f.style.width='0%';if(bar){bar.style.transition='none';bar.style.width='0%'}var phase=0;(function tick(){if(!holdStart)return;var p=Math.min((Date.now()-holdStart)/3000,1);f.style.width=(p*100)+'%';if(bar)bar.style.width=(p*100)+'%';if(p>=1){holdStart=0;insertUrgent();go('emsuccess');return}holdRAF=requestAnimationFrame(tick)})()}
-function endHold(){if(holdRAF)cancelAnimationFrame(holdRAF);holdStart=0;var f=document.getElementById('holdFill');if(f){f.style.transition='width .2s';f.style.width='0%'}var bar=document.getElementById('holdBar');if(bar){bar.style.transition='width .2s';bar.style.width='0%'}}
+function startHold(){holdStart=Date.now();var f=document.getElementById('holdFill');if(!f)return;f.style.transition='none';f.style.width='0%';var phase=0;(function tick(){if(!holdStart)return;var p=Math.min((Date.now()-holdStart)/3000,1);f.style.width=(p*100)+'%';if(p>=1){holdStart=0;insertUrgent();go('emsuccess');return}holdRAF=requestAnimationFrame(tick)})()}
+function endHold(){if(holdRAF)cancelAnimationFrame(holdRAF);holdStart=0;var f=document.getElementById('holdFill');if(f){f.style.transition='width .2s';f.style.width='0%'}}
 
 // ── TOAST ──
 
