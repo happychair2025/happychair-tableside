@@ -177,7 +177,7 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 
 /* ══ MISC ══ */
 .pb{width:100%;padding:14px;background:#f59e0b;border:none;border-radius:12px;color:var(--bg);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:10px;transition:.15s}.pb:hover{filter:brightness(1.08);transform:translateY(-1px)}
-.txt-link{background:none;border:none;color:var(--t2);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;transition:.15s;padding:6px 12px;border-radius:8px}.txt-link:hover{color:var(--t1);background:rgba(255,255,255,.04)}button:focus-visible,.sb:focus-visible,.chip:focus-visible,.fx:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}input:focus-visible,textarea:focus-visible{outline:2px solid #f59e0b;outline-offset:1px}.close-x{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:var(--s2);border:1px solid var(--b);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;z-index:10}.close-x:hover{background:rgba(255,255,255,.06);border-color:var(--b2);transform:scale(1.08)}.close-x svg{width:16px;height:16px;stroke:var(--t2);stroke-width:1.75;transition:.15s}.close-x:hover svg{stroke:var(--t1)}.footer{display:none;padding:8px;text-align:center;color:var(--t2);font-size:12px;flex-shrink:0}
+.txt-link{background:none;border:none;color:var(--t2);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;transition:.15s;padding:6px 12px;border-radius:8px}.txt-link:hover{color:var(--t1);background:rgba(255,255,255,.04)}button:focus-visible,.sb:focus-visible,.chip:focus-visible,.fx:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}input:focus-visible,textarea:focus-visible{outline:none}.close-x{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:var(--s2);border:1px solid var(--b);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;z-index:10}.close-x:hover{background:rgba(255,255,255,.06);border-color:var(--b2);transform:scale(1.08)}.close-x svg{width:16px;height:16px;stroke:var(--t2);stroke-width:1.75;transition:.15s}.close-x:hover svg{stroke:var(--t1)}.footer{display:none;padding:8px;text-align:center;color:var(--t2);font-size:12px;flex-shrink:0}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:300;background:rgba(16,185,129,.12);border:1px solid var(--ok);border-radius:10px;padding:10px 20px;color:var(--ok);font-size:13px;font-weight:600;pointer-events:none;animation:toastIn .25s;backdrop-filter:blur(8px)}
 
 /* ══ ANIMATIONS ══ */
@@ -228,6 +228,7 @@ async function insertRequest(category) {
   });
 }
 
+var lastSentimentId=null;
 async function insertSentiment(score) {
   if (!venueId || !assetId) return;
   var data = {
@@ -236,7 +237,13 @@ async function insertSentiment(score) {
     manager_intervention_needed: score === 1,
     notification_priority: score === 1 ? 'urgent' : score === 2 ? 'normal' : null
   };
-  await sb.from('sentiment_ratings').insert(data);
+  var {data:row} = await sb.from('sentiment_ratings').insert(data).select('id').single();
+  if(row) lastSentimentId=row.id;
+}
+
+async function updateSentimentNotes(notes) {
+  if(!lastSentimentId || !notes) return;
+  await sb.from('sentiment_ratings').update({notes:notes}).eq('id',lastSentimentId);
 }
 
 async function insertAllergens(allergens, severity, notes) {
@@ -534,6 +541,7 @@ function fmtClock(d){return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-di
 function sendFeedback(type){
   var txt=document.getElementById(type==='okay'?'okTxt':'sadTxt');
   var msg=txt?txt.value.trim():'';
+  if(msg)updateSentimentNotes(msg);
   var body=document.getElementById(type==='okay'?'okayBody':'sadBody');
   var who=type==='okay'?'Your server':'A manager';
   var col=type==='okay'?'#f59e0b':'var(--danger)';
