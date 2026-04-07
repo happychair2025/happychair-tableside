@@ -684,7 +684,7 @@ function closeSearch(){document.getElementById('searchRes').classList.remove('op
 // ══════════════════════════════════════════════════════════════
 var holdRAF=null,holdStart=0;
 
-function startHold(){holdStart=Date.now();var f=document.getElementById('holdFill');if(!f)return;f.style.transition='none';f.style.width='0%';var phase=0;(function tick(){if(!holdStart)return;var p=Math.min((Date.now()-holdStart)/3000,1);f.style.width=(p*100)+'%';if(p>=1){holdStart=0;insertUrgent();go('emsuccess');return}holdRAF=requestAnimationFrame(tick)})()}
+function startHold(){holdStart=Date.now();var f=document.getElementById('holdFill');if(!f)return;f.style.transition='none';f.style.width='0%';var phase=0;(function tick(){if(!holdStart)return;var p=Math.min((Date.now()-holdStart)/1500,1);f.style.width=(p*100)+'%';if(p>=1){holdStart=0;insertUrgent();go('emsuccess');return}holdRAF=requestAnimationFrame(tick)})()}
 function endHold(){if(holdRAF)cancelAnimationFrame(holdRAF);holdStart=0;var f=document.getElementById('holdFill');if(f){f.style.transition='width .2s';f.style.width='0%'}}
 
 // ── TOAST ──
