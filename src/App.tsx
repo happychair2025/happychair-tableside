@@ -528,7 +528,7 @@ function App() {
 
         {/* ══ HAPPY ══ */}
         {screen === 'happy' && (
-          <div className="sc" style={{position:'relative'}}>
+          <div className="sc on" style={{position:'relative'}}>
             <CloseX onClick={() => go('main')}/>
             <div className="ob">
               <div className="of" style={{filter:'drop-shadow(0 0 24px rgba(16,185,129,.35))'}}><Face type="ok" size={56}/></div>
@@ -545,7 +545,7 @@ function App() {
 
         {/* ══ OKAY ══ */}
         {screen === 'okay' && (
-          <div className="sc" style={{position:'relative'}}>
+          <div className="sc on" style={{position:'relative'}}>
             <CloseX onClick={() => go('main')}/>
             <div className="ob">
               <div className="of" style={{filter:'drop-shadow(0 0 24px rgba(245,158,11,.35))'}}><Face type="warn" size={56}/></div>
@@ -582,7 +582,7 @@ function App() {
 
         {/* ══ SAD ══ */}
         {screen === 'sad' && (
-          <div className="sc" style={{position:'relative'}}>
+          <div className="sc on" style={{position:'relative'}}>
             <CloseX onClick={() => go('main')}/>
             <div className="ob">
               <div className="of" style={{filter:'drop-shadow(0 0 24px rgba(239,68,68,.35))'}}><Face type="danger" size={56}/></div>
@@ -619,7 +619,7 @@ function App() {
 
         {/* ══ RESOLVED ══ */}
         {screen === 'resolve' && (
-          <div className="sc" style={{position:'relative'}}>
+          <div className="sc on" style={{position:'relative'}}>
             <CloseX onClick={() => go('main')}/>
             <div className="ob">
               <div className="of" style={{filter:'drop-shadow(0 0 24px rgba(34,211,238,.3))'}}>
@@ -637,7 +637,7 @@ function App() {
 
         {/* ══ ALLERGY ══ */}
         {screen === 'allergy' && (
-          <div className="sc" style={{position:'relative'}}>
+          <div className="sc on" style={{position:'relative'}}>
             <CloseX onClick={() => go('main')}/>
             <div className="scr" style={{paddingTop:'14px'}}>
               {/* Shield + Title */}
@@ -764,7 +764,7 @@ function App() {
 
         {/* ══ ALLERGY WAITING ══ */}
         {screen === 'alwait' && (
-          <div className="sc" style={{position:'relative'}}>
+          <div className="sc on" style={{position:'relative'}}>
             <CloseX onClick={() => go('main')}/>
             <div className="ob">
               <div className="wi"><ShieldIcon size={28}/></div>
@@ -782,7 +782,7 @@ function App() {
 
         {/* ══ PROFILE ══ */}
         {screen === 'alack' && (
-          <div className="sc" style={{position:'relative'}}>
+          <div className="sc on" style={{position:'relative'}}>
             <CloseX onClick={() => go('main')}/>
             <div className="ob">
               <div style={{width:'68px',height:'68px',background:'rgba(245,158,11,.08)',border:'2px solid #f59e0b',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'18px',boxShadow:'0 0 30px rgba(245,158,11,.2)'}}>
@@ -809,7 +809,7 @@ function App() {
 
         {/* ══ URGENT ══ */}
         {screen === 'urgent' && (
-          <div className="sc" style={{position:'relative'}}>
+          <div className="sc on" style={{position:'relative'}}>
             <CloseX onClick={() => { endHold(); go('main') }}/>
             <div className="ob">
               <div className="alert-icon"><HandIcon/></div>
