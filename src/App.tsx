@@ -138,6 +138,7 @@ function App() {
   const venueId = params.get('venue') || params.get('v')
   const tableParam = params.get('table') || params.get('t') || params.get('asset')
   const [assetId, setAssetId] = useState<string | null>(tableParam)
+  const [resolvedVenueId, setResolvedVenueId] = useState<string | null>(venueId)
 
   const go = (id: Screen) => {
     setScreen(id)
@@ -187,6 +188,7 @@ function App() {
           if (assetForVenue?.venue_id) resolvedVenueId = assetForVenue.venue_id
         }
         if (!resolvedVenueId) { setAppError('venue_not_found'); setLoading(false); return }
+        setResolvedVenueId(resolvedVenueId)
         const venueResult = await supabase.from('venues').select('*').eq('id', resolvedVenueId).maybeSingle()
         if (venueResult.error || !venueResult.data) { setAppError('venue_not_found'); setLoading(false); return }
         setVenue(venueResult.data)
@@ -221,47 +223,47 @@ function App() {
   // SUPABASE HANDLERS — PRESERVED EXACTLY
   // ══════════════════════════════════════════════════════════════
   const handleRequestCheck = async () => {
-    if (!venueId || !assetId) return
+    if (!resolvedVenueId || !assetId) return
     setSubmitError('')
     const { error } = await supabase.from('requests').insert({
-      venue_id: venueId, asset_id: assetId, category: 'check_please', status: 'pending',
+      venue_id: resolvedVenueId, asset_id: assetId, category: 'check_please', status: 'pending',
     })
     if (error) { setSubmitError('Failed to send request. Please try again.'); return }
   }
 
   const handleRequestWater = async () => {
-    if (!venueId || !assetId) return
+    if (!resolvedVenueId || !assetId) return
     setSubmitError('')
     const { error } = await supabase.from('requests').insert({
-      venue_id: venueId, asset_id: assetId, category: 'water', status: 'pending',
+      venue_id: resolvedVenueId, asset_id: assetId, category: 'water', status: 'pending',
     })
     if (error) { setSubmitError('Failed to send request. Please try again.'); return }
   }
 
   const handleRequestServer = async () => {
-    if (!venueId || !assetId) return
+    if (!resolvedVenueId || !assetId) return
     setSubmitError('')
     const { error } = await supabase.from('requests').insert({
-      venue_id: venueId, asset_id: assetId, category: 'waiter', status: 'pending',
+      venue_id: resolvedVenueId, asset_id: assetId, category: 'waiter', status: 'pending',
     })
     if (error) { setSubmitError('Failed to send request. Please try again.'); return }
   }
 
   const handleRequestPlates = async () => {
-    if (!venueId || !assetId) return
+    if (!resolvedVenueId || !assetId) return
     setSubmitError('')
     const { error } = await supabase.from('requests').insert({
-      venue_id: venueId, asset_id: assetId, category: 'clear', status: 'pending',
+      venue_id: resolvedVenueId, asset_id: assetId, category: 'clear', status: 'pending',
     })
     if (error) { setSubmitError('Failed to send request. Please try again.'); return }
   }
 
   const handleAllergenSubmit = async () => {
-    if (!venueId || !assetId || decl.length === 0) return
+    if (!resolvedVenueId || !assetId || decl.length === 0) return
     setSubmitError('')
     const guestSessionId = crypto.randomUUID()
     const { error } = await supabase.from('allergen_declarations').insert({
-      venue_id: venueId, asset_id: assetId,
+      venue_id: resolvedVenueId, asset_id: assetId,
       allergens: decl.map(d => d.name),
       severity: decl[0]?.risk || 'unknown',
       notes: allergenNotes || undefined,
@@ -272,22 +274,22 @@ function App() {
   }
 
   const submitSentiment = async (score: SentimentScore) => {
-    if (!venueId || !assetId) return
+    if (!resolvedVenueId || !assetId) return
     if (score === 3) {
       await supabase.from('sentiment_ratings').insert({
-        venue_id: venueId, asset_id: assetId, score: 3,
+        venue_id: resolvedVenueId, asset_id: assetId, score: 3,
         google_review_prompted: true, manager_intervention_needed: false, notification_priority: null,
       })
       go('happy')
     } else if (score === 2) {
       await supabase.from('sentiment_ratings').insert({
-        venue_id: venueId, asset_id: assetId, score: 2,
+        venue_id: resolvedVenueId, asset_id: assetId, score: 2,
         google_review_prompted: false, manager_intervention_needed: false, notification_priority: 'normal',
       })
       go('okay')
     } else if (score === 1) {
       await supabase.from('sentiment_ratings').insert({
-        venue_id: venueId, asset_id: assetId, score: 1,
+        venue_id: resolvedVenueId, asset_id: assetId, score: 1,
         google_review_prompted: false, manager_intervention_needed: true, notification_priority: 'urgent',
       })
       go('sad')
@@ -295,9 +297,9 @@ function App() {
   }
 
   const handleUrgentSubmit = async () => {
-    if (!venueId || !assetId) return
+    if (!resolvedVenueId || !assetId) return
     await supabase.from('requests').insert({
-      venue_id: venueId, asset_id: assetId, category: 'critical', status: 'pending',
+      venue_id: resolvedVenueId, asset_id: assetId, category: 'critical', status: 'pending',
     })
   }
 
