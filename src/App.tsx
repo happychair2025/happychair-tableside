@@ -134,8 +134,10 @@ function App() {
   const [showSplash, setShowSplash] = useState(true)
   const [appVisible, setAppVisible] = useState(false)
 
-  const venueId = new URLSearchParams(window.location.search).get('venue')
-  const assetId = new URLSearchParams(window.location.search).get('table')
+  const params = new URLSearchParams(window.location.search)
+  const venueId = params.get('venue') || params.get('v')
+  const tableParam = params.get('table') || params.get('t') || params.get('asset')
+  const [assetId, setAssetId] = useState<string | null>(tableParam)
 
   const go = (id: Screen) => {
     setScreen(id)
@@ -168,7 +170,7 @@ function App() {
   // SUPABASE DATA LOADING — PRESERVED EXACTLY
   // ══════════════════════════════════════════════════════════════
   useEffect(() => {
-    if (!venueId || !assetId) {
+    if (!venueId || !tableParam) {
       setAppError('invalid_qr')
       setLoading(false)
       return
@@ -176,13 +178,27 @@ function App() {
     async function loadData() {
       setLoading(true)
       try {
-        const [venueResult, assetResult] = await Promise.all([
-          supabase.from('venues').select('*').eq('id', venueId).maybeSingle(),
-          supabase.from('assets').select('*').eq('id', assetId).maybeSingle(),
-        ])
+        const venueResult = await supabase.from('venues').select('*').eq('id', venueId).maybeSingle()
         if (venueResult.error || !venueResult.data) { setAppError('venue_not_found'); setLoading(false); return }
-        if (assetResult.error || !assetResult.data) { setAppError('asset_not_found'); setLoading(false); return }
         setVenue(venueResult.data)
+
+        // Try lookup by UUID first, then by label within this venue
+        const tp = tableParam as string // guarded by early return above
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tp)
+        let assetResult
+        if (isUuid) {
+          assetResult = await supabase.from('assets').select('*').eq('id', tp).maybeSingle()
+        }
+        if (!assetResult?.data) {
+          assetResult = await supabase.from('assets').select('*').eq('venue_id', venueId).eq('label', tp).maybeSingle()
+        }
+        if (!assetResult?.data) {
+          // Try case-insensitive label match
+          assetResult = await supabase.from('assets').select('*').eq('venue_id', venueId).ilike('label', tp).maybeSingle()
+        }
+        if (!assetResult?.data) { setAppError('asset_not_found'); setLoading(false); return }
+
+        setAssetId(assetResult.data.id)
         setAsset(assetResult.data)
         setScreen('main')
         setLoading(false)
@@ -194,7 +210,7 @@ function App() {
       }
     }
     loadData()
-  }, [venueId, assetId])
+  }, [venueId, tableParam])
 
   // ══════════════════════════════════════════════════════════════
   // SUPABASE HANDLERS — PRESERVED EXACTLY
