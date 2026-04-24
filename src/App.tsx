@@ -170,7 +170,7 @@ function App() {
   // SUPABASE DATA LOADING — PRESERVED EXACTLY
   // ══════════════════════════════════════════════════════════════
   useEffect(() => {
-    if (!venueId || !tableParam) {
+    if (!tableParam) {
       setAppError('invalid_qr')
       setLoading(false)
       return
@@ -178,23 +178,28 @@ function App() {
     async function loadData() {
       setLoading(true)
       try {
-        const venueResult = await supabase.from('venues').select('*').eq('id', venueId).maybeSingle()
-        if (venueResult.error || !venueResult.data) { setAppError('venue_not_found'); setLoading(false); return }
-        setVenue(venueResult.data)
-
         // Try lookup by UUID first, then by label within this venue
         const tp = tableParam as string // guarded by early return above
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tp)
+        let resolvedVenueId = venueId
+        if (!resolvedVenueId && isUuid) {
+          const { data: assetForVenue } = await supabase.from('assets').select('venue_id').eq('id', tp).maybeSingle()
+          if (assetForVenue?.venue_id) resolvedVenueId = assetForVenue.venue_id
+        }
+        if (!resolvedVenueId) { setAppError('venue_not_found'); setLoading(false); return }
+        const venueResult = await supabase.from('venues').select('*').eq('id', resolvedVenueId).maybeSingle()
+        if (venueResult.error || !venueResult.data) { setAppError('venue_not_found'); setLoading(false); return }
+        setVenue(venueResult.data)
         let assetResult
         if (isUuid) {
           assetResult = await supabase.from('assets').select('*').eq('id', tp).maybeSingle()
         }
         if (!assetResult?.data) {
-          assetResult = await supabase.from('assets').select('*').eq('venue_id', venueId).eq('label', tp).maybeSingle()
+          assetResult = await supabase.from('assets').select('*').eq('venue_id', resolvedVenueId).eq('label', tp).maybeSingle()
         }
         if (!assetResult?.data) {
           // Try case-insensitive label match
-          assetResult = await supabase.from('assets').select('*').eq('venue_id', venueId).ilike('label', tp).maybeSingle()
+          assetResult = await supabase.from('assets').select('*').eq('venue_id', resolvedVenueId).ilike('label', tp).maybeSingle()
         }
         if (!assetResult?.data) { setAppError('asset_not_found'); setLoading(false); return }
 
