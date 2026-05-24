@@ -100,6 +100,8 @@ function App() {
   const [errorMessage, setErrorMessage] = useState('')
   const [submitError, setSubmitError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [sentimentRowId, setSentimentRowId] = useState<string | null>(null)
+  const [notesSubmitting, setNotesSubmitting] = useState(false)
   const [appError, setAppError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string|null>(null)
@@ -141,6 +143,14 @@ function App() {
   const go = (id: Screen) => {
     setScreen(id)
     setSubmitError('')
+    // Reset sentiment session state on return to main so each new sentiment
+    // attempt starts clean (no stale row id, no leftover note text).
+    if (id === 'main') {
+      setSentimentRowId(null)
+      setFeedbackSent(null)
+      setOkayNote('')
+      setSadNote('')
+    }
   }
 
   const showToast = (msg: string) => {
@@ -280,13 +290,24 @@ function App() {
       : score === 2
       ? { venue_id: resolvedVenueId, asset_id: assetId, score, google_review_prompted: false, manager_intervention_needed: false, notification_priority: 'normal' }
       : { venue_id: resolvedVenueId, asset_id: assetId, score, google_review_prompted: false, manager_intervention_needed: true, notification_priority: 'urgent' }
-    const { error } = await supabase.from('sentiment_ratings').insert(payload)
-    if (error) {
+    // .select('id').single() so we can UPDATE this row later with optional notes.
+    const { data, error } = await supabase
+      .from('sentiment_ratings')
+      .insert(payload)
+      .select('id')
+      .single()
+    if (error || !data) {
       console.error('[tableside] sentiment submit failed:', error)
       setSubmitError("Couldn't send feedback — try again.")
       setSubmitting(false)
       return
     }
+    // Reset any leftover note state from a prior sentiment session before
+    // capturing the new row id.
+    setOkayNote('')
+    setSadNote('')
+    setFeedbackSent(null)
+    setSentimentRowId(data.id)
     setSubmitting(false)
     go(score === 3 ? 'happy' : score === 2 ? 'okay' : 'sad')
   }
@@ -346,18 +367,30 @@ function App() {
   // ══════════════════════════════════════════════════════════════
   // SENTIMENT FEEDBACK
   // ══════════════════════════════════════════════════════════════
-  const sendFeedback = (type: 'okay'|'sad') => {
-    const now = new Date()
-    setFeedbackSent({type, submitTime: now, ackTime: null, resolveTime: null})
-    // Simulate ack
-    setTimeout(() => {
-      setFeedbackSent(prev => prev ? {...prev, ackTime: new Date()} : null)
-    }, 3000 + Math.random() * 4000)
-    // Simulate resolve
-    setTimeout(() => {
-      setFeedbackSent(prev => prev ? {...prev, resolveTime: new Date()} : null)
-      setTimeout(() => go('resolve'), 2000)
-    }, 8000 + Math.random() * 7000)
+  // Persists the note to the existing sentiment_ratings row created at sentiment
+  // tap. The previous version simulated ack/resolve via setTimeout and never
+  // wrote to Supabase — the textarea content was silently discarded. Real
+  // ack/resolve signals don't exist on this table; the timeline below honestly
+  // displays "waiting…" / "—" for those states.
+  const sendFeedback = async (type: 'okay'|'sad') => {
+    if (!sentimentRowId || notesSubmitting) return
+    const noteText = (type === 'okay' ? okayNote : sadNote).trim()
+    if (!noteText) return
+    setNotesSubmitting(true)
+    setSubmitError('')
+    const { error } = await supabase
+      .from('sentiment_ratings')
+      .update({ notes: noteText })
+      .eq('id', sentimentRowId)
+    if (error) {
+      console.error('[tableside] notes update failed:', error)
+      setSubmitError("Couldn't send your message — try again.")
+      setNotesSubmitting(false)
+      // Textarea text intentionally preserved so the guest can retry without retyping.
+      return
+    }
+    setNotesSubmitting(false)
+    setFeedbackSent({ type, submitTime: new Date(), ackTime: null, resolveTime: null })
   }
 
   const fmtClock = (d: Date) => d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})
@@ -567,9 +600,9 @@ function App() {
                   <div className="ac-t">What Can We Fix Right Now?</div>
                   <div className="ac-s">Share a quick note so we can help faster.</div>
                   <textarea className="ac-ta" value={okayNote} onChange={e=>setOkayNote(e.target.value)} placeholder="What can we improve?"/>
-                  <button className="ac-btn" style={{background:'#f59e0b',color:'var(--bg)',width:'100%',border:'none',borderRadius:'10px',padding:'13px',fontSize:'14px',fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px'}} onClick={() => sendFeedback('okay')}>
+                  <button className="ac-btn" style={{background:'#f59e0b',color:'var(--bg)',width:'100%',border:'none',borderRadius:'10px',padding:'13px',fontSize:'14px',fontWeight:700,cursor:notesSubmitting||!okayNote.trim()?'not-allowed':'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',opacity:notesSubmitting||!okayNote.trim()?.6:1}} disabled={notesSubmitting||!okayNote.trim()} onClick={() => sendFeedback('okay')}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    Send to Server
+                    {notesSubmitting ? 'Sending…' : 'Send to Server'}
                   </button>
                 </div>
               ) : (
@@ -604,9 +637,9 @@ function App() {
                   <div className="ac-t">Tell Us What Happened</div>
                   <div className="ac-s">This helps us resolve it quickly.</div>
                   <textarea className="ac-ta" value={sadNote} onChange={e=>setSadNote(e.target.value)} placeholder="What went wrong?"/>
-                  <button className="ac-btn" style={{background:'var(--danger)',color:'#fff',width:'100%',border:'none',borderRadius:'10px',padding:'13px',fontSize:'14px',fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px'}} onClick={() => sendFeedback('sad')}>
+                  <button className="ac-btn" style={{background:'var(--danger)',color:'#fff',width:'100%',border:'none',borderRadius:'10px',padding:'13px',fontSize:'14px',fontWeight:700,cursor:notesSubmitting||!sadNote.trim()?'not-allowed':'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',opacity:notesSubmitting||!sadNote.trim()?.6:1}} disabled={notesSubmitting||!sadNote.trim()} onClick={() => sendFeedback('sad')}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    Send to Manager
+                    {notesSubmitting ? 'Sending…' : 'Send to Manager'}
                   </button>
                 </div>
               ) : (

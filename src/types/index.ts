@@ -42,4 +42,7 @@ export interface SentimentRatingInsert {
   score: SentimentScore
   google_review_prompted: boolean
   manager_intervention_needed: boolean
+  // Optional on insert. Notes are typically attached later via UPDATE when the
+  // guest fills the textarea on the okay/sad screen.
+  notes?: string
 }
