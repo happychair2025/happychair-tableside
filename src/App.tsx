@@ -3,9 +3,7 @@ import { supabase } from './lib/supabase'
 import type {
   Venue,
   Asset,
-  RequestCategory,
   SentimentScore,
-  AllergenSeverity,
 } from './types'
 
 // ══════════════════════════════════════════════════════════════
@@ -101,6 +99,7 @@ function App() {
   const [asset, setAsset] = useState<Asset | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [submitError, setSubmitError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const [appError, setAppError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string|null>(null)
@@ -125,7 +124,6 @@ function App() {
   const searchRef = useRef<HTMLDivElement>(null)
 
   // ── URGENT STATE ──
-  const [holdStart, setHoldStart] = useState<number|null>(null)
   const [holdProgress, setHoldProgress] = useState(0)
   const [holdPhase, setHoldPhase] = useState(0)
   const holdRAF = useRef<number|null>(null)
@@ -274,33 +272,39 @@ function App() {
   }
 
   const submitSentiment = async (score: SentimentScore) => {
-    if (!resolvedVenueId || !assetId) return
-    if (score === 3) {
-      await supabase.from('sentiment_ratings').insert({
-        venue_id: resolvedVenueId, asset_id: assetId, score: 3,
-        google_review_prompted: true, manager_intervention_needed: false, notification_priority: null,
-      })
-      go('happy')
-    } else if (score === 2) {
-      await supabase.from('sentiment_ratings').insert({
-        venue_id: resolvedVenueId, asset_id: assetId, score: 2,
-        google_review_prompted: false, manager_intervention_needed: false, notification_priority: 'normal',
-      })
-      go('okay')
-    } else if (score === 1) {
-      await supabase.from('sentiment_ratings').insert({
-        venue_id: resolvedVenueId, asset_id: assetId, score: 1,
-        google_review_prompted: false, manager_intervention_needed: true, notification_priority: 'urgent',
-      })
-      go('sad')
+    if (!resolvedVenueId || !assetId || submitting) return
+    setSubmitting(true)
+    setSubmitError('')
+    const payload = score === 3
+      ? { venue_id: resolvedVenueId, asset_id: assetId, score, google_review_prompted: true, manager_intervention_needed: false, notification_priority: null }
+      : score === 2
+      ? { venue_id: resolvedVenueId, asset_id: assetId, score, google_review_prompted: false, manager_intervention_needed: false, notification_priority: 'normal' }
+      : { venue_id: resolvedVenueId, asset_id: assetId, score, google_review_prompted: false, manager_intervention_needed: true, notification_priority: 'urgent' }
+    const { error } = await supabase.from('sentiment_ratings').insert(payload)
+    if (error) {
+      console.error('[tableside] sentiment submit failed:', error)
+      setSubmitError("Couldn't send feedback — try again.")
+      setSubmitting(false)
+      return
     }
+    setSubmitting(false)
+    go(score === 3 ? 'happy' : score === 2 ? 'okay' : 'sad')
   }
 
-  const handleUrgentSubmit = async () => {
-    if (!resolvedVenueId || !assetId) return
-    await supabase.from('requests').insert({
+  // Returns true on success so the caller can gate the success toast/navigation.
+  // The hold mechanism in the urgent surface acts as the in-flight guard, so no
+  // submitting flag is needed here.
+  const handleUrgentSubmit = async (): Promise<boolean> => {
+    if (!resolvedVenueId || !assetId) return false
+    const { error } = await supabase.from('requests').insert({
       venue_id: resolvedVenueId, asset_id: assetId, category: 'critical', status: 'pending',
     })
+    if (error) {
+      console.error('[tableside] urgent submit failed:', error)
+      setSubmitError("Couldn't reach staff — please wave for help.")
+      return false
+    }
+    return true
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -390,7 +394,7 @@ function App() {
   // ══════════════════════════════════════════════════════════════
   const startHold = () => {
     const start = Date.now()
-    setHoldStart(start); setHoldPhase(0)
+    setHoldPhase(0)
     const tick = () => {
       const p = Math.min((Date.now() - start) / 3000, 1)
       setHoldProgress(p)
@@ -398,8 +402,15 @@ function App() {
       else if (p >= 0.15 && holdPhase < 1) setHoldPhase(1)
       if (p >= 1) {
         setHoldPhase(3)
-        handleUrgentSubmit()
-        setTimeout(() => { go('main'); showToast('Help is on the way — staff alerted') }, 1200)
+        // Gate the success toast on the actual insert succeeding — without this
+        // the guest sees "Help is on the way" even when the row never lands.
+        handleUrgentSubmit().then(ok => {
+          setTimeout(() => {
+            go('main')
+            if (ok) showToast('Help is on the way — staff alerted')
+            // On failure submitError is already set; it renders on the main screen.
+          }, 1200)
+        })
         return
       }
       holdRAF.current = requestAnimationFrame(tick)
@@ -409,7 +420,7 @@ function App() {
 
   const endHold = () => {
     if (holdRAF.current) cancelAnimationFrame(holdRAF.current)
-    setHoldStart(null); setHoldProgress(0); setHoldPhase(0)
+    setHoldProgress(0); setHoldPhase(0)
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -516,9 +527,9 @@ function App() {
             <div className="sent">
               <div className="sent-q">How's Everything?</div>
               <div className="sr">
-                <button className="fx pos" onClick={() => submitSentiment(3)}><Face type="ok" size={20}/><span className="fx-t">I'm Happy</span></button>
-                <button className="fx neu" onClick={() => submitSentiment(2)}><Face type="warn" size={20}/><span className="fx-t">It Was Okay</span></button>
-                <button className="fx neg" onClick={() => submitSentiment(1)}><Face type="danger" size={20}/><span className="fx-t">Disappointed</span></button>
+                <button className="fx pos" disabled={submitting} onClick={() => submitSentiment(3)}><Face type="ok" size={20}/><span className="fx-t">I'm Happy</span></button>
+                <button className="fx neu" disabled={submitting} onClick={() => submitSentiment(2)}><Face type="warn" size={20}/><span className="fx-t">It Was Okay</span></button>
+                <button className="fx neg" disabled={submitting} onClick={() => submitSentiment(1)}><Face type="danger" size={20}/><span className="fx-t">Disappointed</span></button>
               </div>
             </div>
 
