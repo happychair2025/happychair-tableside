@@ -3,11 +3,13 @@ export type RequestStatus = 'pending' | 'accepted' | 'completed'
 export type AllergenSeverity = 'mild' | 'moderate' | 'severe' | 'anaphylactic'
 export type SentimentScore = 1 | 2 | 3
 
+// Narrowed 2026-08-11 to exactly what the venue query selects and the UI renders
+// (`venue?.name` at the header, twice). The row is fetched with select('id,name')
+// so anon can be restricted to those two columns — declaring logo_url /
+// google_review_url here would assert fields we no longer fetch.
 export interface Venue {
   id: string
   name: string
-  logo_url: string | null
-  google_review_url: string | null
 }
 
 export interface Asset {

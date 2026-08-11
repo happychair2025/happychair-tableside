@@ -31,6 +31,24 @@ const SEV = [
   {v:'severe',l:'Severe Reaction',d:'Serious response',c:'#f59e0b',dots:'● ●'},
   {v:'anaphylaxis',l:'Anaphylaxis Risk',d:'Life-threatening',c:'#ef4444',dots:'● ● ●'},
 ];
+// Ascending risk order, derived from SEV so the two can never drift apart.
+// A declaration carries ONE severity, but the guest sets a risk PER allergen — the
+// row must therefore carry the highest risk declared, not the first one entered.
+const SEV_RANK: Record<string, number> = SEV.reduce(
+  (acc, s, i) => { acc[s.v] = i; return acc },
+  {} as Record<string, number>
+);
+// Highest-risk value among the declared allergens. Returns null when the list is
+// empty or every risk is unrecognised — callers must treat null as "do not submit"
+// rather than substituting a default, because no safe default exists for severity.
+function maxSeverity(risks: string[]): string | null {
+  let best: string | null = null;
+  for (const r of risks) {
+    if (!(r in SEV_RANK)) continue;
+    if (best === null || SEV_RANK[r] > SEV_RANK[best]) best = r;
+  }
+  return best;
+}
 const SEV_COLORS: Record<string,string> = {unsure:'#94a3b8',discomfort:'#22d3ee',severe:'#f59e0b',anaphylaxis:'#ef4444'};
 const SEV_BGS: Record<string,string> = {unsure:'rgba(148,163,184,.1)',discomfort:'rgba(34,211,238,.1)',severe:'rgba(245,158,11,.1)',anaphylaxis:'rgba(239,68,68,.1)'};
 
@@ -197,7 +215,14 @@ function App() {
         }
         if (!resolvedVenueId) { setAppError('venue_not_found'); setLoading(false); return }
         setResolvedVenueId(resolvedVenueId)
-        const venueResult = await supabase.from('venues').select('*').eq('id', resolvedVenueId).maybeSingle()
+        // select('id,name') — exactly the two columns used: id for this filter, name
+        // for the header. Previously select('*'), which pulled all 47 venue columns
+        // (tenant_id, owner_user_id, stripe_customer_id, plan_status, address, phone…)
+        // to an unauthenticated client that renders none of them. Narrowing here is
+        // what allows anon to be restricted to (id, name) at the grant level — under
+        // column-scoped grants Postgres denies a select('*') outright rather than
+        // returning the permitted subset, so this must ship BEFORE that grant applies.
+        const venueResult = await supabase.from('venues').select('id,name').eq('id', resolvedVenueId).maybeSingle()
         if (venueResult.error || !venueResult.data) { setAppError('venue_not_found'); setLoading(false); return }
         setVenue(venueResult.data)
         let assetResult
@@ -270,10 +295,26 @@ function App() {
     if (!resolvedVenueId || !assetId || decl.length === 0) return
     setSubmitError('')
     const guestSessionId = crypto.randomUUID()
+    // Severity is the HIGHEST risk declared, not the first entered. Previously this
+    // read decl[0]?.risk: a guest declaring lactose (discomfort) then peanut
+    // (anaphylaxis) wrote 'discomfort'. The kitchen board gates its anaphylaxis
+    // chime and its lockout screen on this exact field, so the escalation silently
+    // did not fire — a row was written, it looked correct, and nothing downstream
+    // knew it was wrong.
+    const severity = maxSeverity(decl.map(d => d.risk))
+    // No safe default exists for severity, so refuse to submit rather than guess.
+    // The prior `|| 'unknown'` was not a valid value either — the DB CHECK allows
+    // only {unsure, discomfort, severe, anaphylaxis}, so it would have failed as an
+    // opaque 23514 after the guest thought they had sent it.
+    if (!severity) { setSubmitError('Please set a risk level for each allergy.'); return }
     const { error } = await supabase.from('allergen_declarations').insert({
       venue_id: resolvedVenueId, asset_id: assetId,
       allergens: decl.map(d => d.name),
-      severity: decl[0]?.risk || 'unknown',
+      severity,
+      // Collected per allergen and shown back to the guest as a "Cross-Contact"
+      // badge, but never persisted until now. some() is the safe reading: if the
+      // guest flagged cross-contact on ANY allergen, the declaration carries it.
+      cross_contact: decl.some(d => d.xc),
       notes: allergenNotes || undefined,
       guest_session_id: guestSessionId,
       status: 'pending',
@@ -817,9 +858,23 @@ function App() {
               <div style={{marginTop:'16px',display:'flex',alignItems:'center',gap:'10px',color:'var(--t1)',fontSize:'14px',fontWeight:500}}>
                 <div className="spinner"/> Waiting for confirmation...
               </div>
-              <button onClick={() => go('alack')} style={{marginTop:'20px',padding:'10px 20px',background:'none',border:'1px solid var(--b)',borderRadius:'10px',color:'var(--t1)',fontSize:'13px',cursor:'pointer',fontFamily:'inherit'}}>
-                Demo: simulate acknowledgment →
-              </button>
+              {/* REMOVED 2026-08-11: a "Demo: simulate acknowledgment →" button sat
+                  here, ungated, on a production QR-reachable URL. It navigated to the
+                  'alack' screen — "You're All Set" — letting a real guest fabricate
+                  their own acknowledgment on the first screen an anaphylaxis guest
+                  sees. Deliberately DELETED rather than gated behind
+                  import.meta.env.DEV: a build-config mistake must not be the only
+                  thing standing between a guest and a false confirmation.
+
+                  CONSEQUENCE, recorded rather than papered over: that button was the
+                  ONLY navigation to 'alack', so the "You're All Set" screen is now
+                  unreachable. There is no real acknowledgment path to replace it —
+                  tableside holds no realtime subscription of any kind and never reads
+                  kitchen_ack_at back, so it cannot learn that the kitchen acted. The
+                  guest now correctly sits on "Waiting for confirmation…" instead of
+                  being handed a fabricated one. The 'alack' branch is left in place as
+                  the destination for a real ack path when one is built; it is dead
+                  code until then. Tracked with the item-3 copy work. */}
             </div>
           </div>
         )}
