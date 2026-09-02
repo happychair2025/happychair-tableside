@@ -117,6 +117,10 @@ function App() {
   const [asset, setAsset] = useState<Asset | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [submitError, setSubmitError] = useState('')
+  // Snapshot of what was ACTUALLY accepted by the database, captured at the moment the
+  // INSERT succeeds. The receipt screen echoes this rather than re-reading `decl`, so the
+  // guest is shown what Happy Chair holds, not what happens to be in the form afterwards.
+  const [receipt, setReceipt] = useState<{allergens:string[],severity:string}|null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [sentimentRowId, setSentimentRowId] = useState<string | null>(null)
   const [notesSubmitting, setNotesSubmitting] = useState(false)
@@ -292,7 +296,11 @@ function App() {
   }
 
   const handleAllergenSubmit = async () => {
-    if (!resolvedVenueId || !assetId || decl.length === 0) return
+    if (!resolvedVenueId || !assetId || decl.length === 0) {
+      // Previously a silent `return` that still navigated the guest to a success screen.
+      setSubmitError("We couldn't confirm your allergy declaration was received. Please tell your server about the allergy directly.")
+      return null
+    }
     setSubmitError('')
     const guestSessionId = crypto.randomUUID()
     // Severity is the HIGHEST risk declared, not the first entered. Previously this
@@ -306,7 +314,7 @@ function App() {
     // The prior `|| 'unknown'` was not a valid value either — the DB CHECK allows
     // only {unsure, discomfort, severe, anaphylaxis}, so it would have failed as an
     // opaque 23514 after the guest thought they had sent it.
-    if (!severity) { setSubmitError('Please set a risk level for each allergy.'); return }
+    if (!severity) { setSubmitError('Please set a risk level for each allergy.'); return null }
     const { error } = await supabase.from('allergen_declarations').insert({
       venue_id: resolvedVenueId, asset_id: assetId,
       allergens: decl.map(d => d.name),
@@ -319,7 +327,15 @@ function App() {
       guest_session_id: guestSessionId,
       status: 'pending',
     })
-    if (error) { setSubmitError('Failed to send. Please try again.'); return }
+    // A failed declaration must fail toward a human. "Try again" alone leaves a guest with
+    // an allergy believing the restaurant has something it does not.
+    if (error) {
+      setSubmitError("We couldn't confirm your allergy declaration was received. Please tell your server about the allergy directly.")
+      return null
+    }
+    // Only the database accepting the row establishes receipt. Returned so the caller can
+    // gate navigation on it — see trySubmit.
+    return { allergens: decl.map(d => d.name), severity }
   }
 
   const submitSentiment = async (score: SentimentScore) => {
@@ -457,9 +473,19 @@ function App() {
     ? ALLERGEN_DB.filter(a => a.n.toLowerCase().includes(allergenSearch.toLowerCase()) && !decl.some(d => d.name === a.n)).slice(0, 6)
     : []
 
-  const trySubmit = () => {
+  const trySubmit = async () => {
     if (decl.length === 0) { setSubmitHint(true); setTimeout(() => setSubmitHint(false), 3000); return }
-    handleAllergenSubmit()
+    if (submitting) return
+    // The receipt screen is reachable ONLY through a successful INSERT. Previously this
+    // called handleAllergenSubmit() without awaiting it and then navigated
+    // unconditionally, so the guest saw a confirmation before — and regardless of —
+    // whether the declaration was ever stored, and the failure message rendered on a
+    // screen they had already left.
+    setSubmitting(true)
+    const result = await handleAllergenSubmit()
+    setSubmitting(false)
+    if (!result) return          // stay put; submitError is rendered on this screen
+    setReceipt(result)
     go('alwait')
   }
 
@@ -840,41 +866,48 @@ function App() {
 
               {/* Submit */}
               {submitHint && <div style={{color:'#f59e0b',fontSize:'12px',textAlign:'center',padding:'6px'}}>Select at least one allergen above.</div>}
-              <button className="sbtn" onClick={trySubmit}>
-                <ShieldIcon size={18} color="var(--bg)"/> Notify Staff
+              {/* The failure message renders HERE, on the screen the guest is left on when
+                  the INSERT fails. It previously rendered only on the main screen, which a
+                  submitting guest had already navigated away from — so the error existed in
+                  the DOM of a screen nobody was looking at. */}
+              {submitError && <div style={{color:'#fca5a5',background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.25)',borderRadius:'8px',padding:'12px 14px',fontSize:'13px',lineHeight:1.5,textAlign:'center',margin:'0 0 10px'}}>{submitError}</div>}
+              <button className="sbtn" onClick={trySubmit} disabled={submitting}>
+                <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : 'Notify Staff'}
               </button>
             </div>
           </div>
         )}
 
-        {/* ══ ALLERGY WAITING ══ */}
+        {/* ══ ALLERGY RECEIPT ══ */}
+        {/* Reachable ONLY after a successful INSERT (see trySubmit). States exactly one
+            fact: Happy Chair durably holds the declaration for this venue. It deliberately
+            does NOT claim a server was notified, a kitchen display received it, or any
+            venue employee has seen it — none of those events has occurred, and two of them
+            have no implementation at all. The previous copy read "Your server has been
+            notified" above a spinner reading "Waiting for confirmation…", which promised a
+            state change that could never arrive: this app holds no realtime subscription
+            and never re-reads the row. */}
         {screen === 'alwait' && (
           <div className="sc on" style={{position:'relative'}}>
             <CloseX onClick={() => go('main')}/>
             <div className="ob">
               <div className="wi"><ShieldIcon size={28}/></div>
-              <div className="ot" style={{color:'#f59e0b'}}>{decl.length === 1 ? 'Allergy Sent' : 'Allergies Sent'}</div>
-              <div className="os">Your server has been notified.</div>
-              <div style={{marginTop:'16px',display:'flex',alignItems:'center',gap:'10px',color:'var(--t1)',fontSize:'14px',fontWeight:500}}>
-                <div className="spinner"/> Waiting for confirmation...
-              </div>
-              {/* REMOVED 2026-08-11: a "Demo: simulate acknowledgment →" button sat
-                  here, ungated, on a production QR-reachable URL. It navigated to the
-                  'alack' screen — "You're All Set" — letting a real guest fabricate
-                  their own acknowledgment on the first screen an anaphylaxis guest
-                  sees. Deliberately DELETED rather than gated behind
-                  import.meta.env.DEV: a build-config mistake must not be the only
-                  thing standing between a guest and a false confirmation.
-
-                  CONSEQUENCE, recorded rather than papered over: that button was the
-                  ONLY navigation to 'alack', so the "You're All Set" screen is now
-                  unreachable. There is no real acknowledgment path to replace it —
-                  tableside holds no realtime subscription of any kind and never reads
-                  kitchen_ack_at back, so it cannot learn that the kitchen acted. The
-                  guest now correctly sits on "Waiting for confirmation…" instead of
-                  being handed a fabricated one. The 'alack' branch is left in place as
-                  the destination for a real ack path when one is built; it is dead
-                  code until then. Tracked with the item-3 copy work. */}
+              <div className="ot" style={{color:'#f59e0b'}}>Declaration Received</div>
+              <div className="os">Your allergy declaration was received by Happy Chair for {venue?.name ?? 'this venue'}.</div>
+              {/* Faithful echo of what the database accepted — the guest's own allergen
+                  names and their own severity wording from the picker (SEV[].l). No new
+                  safety vocabulary is introduced here. */}
+              {receipt && (
+                <div style={{marginTop:'18px',background:'var(--s1)',border:'1px solid var(--b)',borderRadius:'12px',padding:'14px 18px',maxWidth:'320px',width:'100%'}}>
+                  <div style={{fontSize:'15px',fontWeight:600,color:'var(--t1)',textAlign:'center',lineHeight:1.5}}>
+                    {receipt.allergens.join(', ')}
+                    <span style={{color:'var(--t2)',margin:'0 6px'}}>·</span>
+                    <span style={{color: SEV.find(x => x.v === receipt.severity)?.c ?? 'var(--t1)'}}>
+                      {SEV.find(x => x.v === receipt.severity)?.l ?? receipt.severity}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
