@@ -120,7 +120,10 @@ function App() {
   // Snapshot of what was ACTUALLY accepted by the database, captured at the moment the
   // INSERT succeeds. The receipt screen echoes this rather than re-reading `decl`, so the
   // guest is shown what Happy Chair holds, not what happens to be in the form afterwards.
-  const [receipt, setReceipt] = useState<{allergens:string[],severity:string}|null>(null)
+  const [receipt, setReceipt] = useState<{id:string,allergens:string[],severity:string}|null>(null)
+  // Timestamp of a DATABASE-PERSISTED kitchen_ack_at. Null means only "venue review has not
+  // yet been proven" — never an error, and never a reason to retract the proven receipt.
+  const [reviewedAt, setReviewedAt] = useState<string|null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [sentimentRowId, setSentimentRowId] = useState<string | null>(null)
   const [notesSubmitting, setNotesSubmitting] = useState(false)
@@ -315,7 +318,10 @@ function App() {
     // only {unsure, discomfort, severe, anaphylaxis}, so it would have failed as an
     // opaque 23514 after the guest thought they had sent it.
     if (!severity) { setSubmitError('Please set a risk level for each allergy.'); return null }
-    const { error } = await supabase.from('allergen_declarations').insert({
+    // .select('id').single() so the declaration can be re-read by id afterwards. anon holds
+    // both the INSERT and SELECT grant, and the select policy qual
+    // (created_at >= now() - 36h) is satisfied by a row created moments ago.
+    const { data: row, error } = await supabase.from('allergen_declarations').insert({
       venue_id: resolvedVenueId, asset_id: assetId,
       allergens: decl.map(d => d.name),
       severity,
@@ -326,7 +332,7 @@ function App() {
       notes: allergenNotes || undefined,
       guest_session_id: guestSessionId,
       status: 'pending',
-    })
+    }).select('id').single()
     // A failed declaration must fail toward a human. "Try again" alone leaves a guest with
     // an allergy believing the restaurant has something it does not.
     if (error) {
@@ -335,7 +341,7 @@ function App() {
     }
     // Only the database accepting the row establishes receipt. Returned so the caller can
     // gate navigation on it — see trySubmit.
-    return { allergens: decl.map(d => d.name), severity }
+    return { id: row.id as string, allergens: decl.map(d => d.name), severity }
   }
 
   const submitSentiment = async (score: SentimentScore) => {
@@ -473,6 +479,35 @@ function App() {
     ? ALLERGEN_DB.filter(a => a.n.toLowerCase().includes(allergenSearch.toLowerCase()) && !decl.some(d => d.name === a.n)).slice(0, 6)
     : []
 
+  // VENUE-REVIEW POLL. One declaration row, one guest-facing state.
+  //
+  // Deliberately a poll and NOT a realtime subscription. A subscription would satisfy only
+  // the case where the acknowledgement happens while the guest is watching; it would still
+  // need a read for an acknowledgement that landed BEFORE the guest got here, and another
+  // for one missed during a drop — two mechanisms doing one job, plus channel lifecycle and
+  // reconnect handling this app has never had. The leading immediate read below covers all
+  // three cases with a single code path.
+  //
+  // Bounded by the screen: it runs only while the receipt is on screen and stops the moment
+  // review is proven. Leaving the screen clears it; returning re-runs the immediate read, so
+  // an acknowledgement that landed in between is picked up at once.
+  //
+  // A failed read is swallowed. Receipt is already proven and must not be retracted because
+  // a later read failed, and a missing kitchen_ack_at is not an error — see AC-5.
+  useEffect(() => {
+    if (screen !== 'alwait' || !receipt || reviewedAt) return
+    let cancelled = false
+    const check = async () => {
+      const { data, error } = await supabase
+        .from('allergen_declarations').select('kitchen_ack_at').eq('id', receipt.id).maybeSingle()
+      if (cancelled || error || !data) return
+      if (data.kitchen_ack_at) setReviewedAt(data.kitchen_ack_at as string)
+    }
+    check()
+    const t = setInterval(check, 5000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [screen, receipt, reviewedAt])
+
   const trySubmit = async () => {
     if (decl.length === 0) { setSubmitHint(true); setTimeout(() => setSubmitHint(false), 3000); return }
     if (submitting) return
@@ -485,6 +520,7 @@ function App() {
     const result = await handleAllergenSubmit()
     setSubmitting(false)
     if (!result) return          // stay put; submitError is rendered on this screen
+    setReviewedAt(null)
     setReceipt(result)
     go('alwait')
   }
@@ -872,7 +908,9 @@ function App() {
                   the DOM of a screen nobody was looking at. */}
               {submitError && <div style={{color:'#fca5a5',background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.25)',borderRadius:'8px',padding:'12px 14px',fontSize:'13px',lineHeight:1.5,textAlign:'center',margin:'0 0 10px'}}>{submitError}</div>}
               <button className="sbtn" onClick={trySubmit} disabled={submitting}>
-                <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : 'Notify Staff'}
+                {/* "Notify Staff" overstated what submission does — no staff-facing allergy
+                    surface exists in the product. The button sends a declaration; it says so. */}
+                <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : 'Send Allergy Declaration'}
               </button>
             </div>
           </div>
@@ -892,8 +930,14 @@ function App() {
             <CloseX onClick={() => go('main')}/>
             <div className="ob">
               <div className="wi"><ShieldIcon size={28}/></div>
-              <div className="ot" style={{color:'#f59e0b'}}>Declaration Received</div>
-              <div className="os">Your allergy declaration was received by Happy Chair for {venue?.name ?? 'this venue'}.</div>
+              {/* Two provenance states, one screen. State 1 is proven by the INSERT; state 2
+                  only by a database-persisted kitchen_ack_at. State 2 says REVIEW and nothing
+                  more — no employee name (attribution is a device string until Track B), no
+                  server notification, no preparation, no verification, no safety claim. */}
+              <div className="ot" style={{color:'#f59e0b'}}>{reviewedAt ? 'Reviewed by Venue' : 'Declaration Received'}</div>
+              <div className="os">{reviewedAt
+                ? `${venue?.name ?? 'The venue'} has reviewed your allergy declaration.`
+                : `Your allergy declaration was received by Happy Chair for ${venue?.name ?? 'this venue'}.`}</div>
               {/* Faithful echo of what the database accepted — the guest's own allergen
                   names and their own severity wording from the picker (SEV[].l). No new
                   safety vocabulary is introduced here. */}
