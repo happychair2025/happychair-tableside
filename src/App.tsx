@@ -41,6 +41,20 @@ const SEV_RANK: Record<string, number> = SEV.reduce(
 // Highest-risk value among the declared allergens. Returns null when the list is
 // empty or every risk is unrecognised — callers must treat null as "do not submit"
 // rather than substituting a default, because no safe default exists for severity.
+// Are two declarations the same statement? Used to tell an IDENTICAL retry (adopt the
+// committed row) from a CHANGED retry (extend the chain). Allergen order is not meaning,
+// so it is normalised out; notes null and '' are the same absence of a note.
+function sameDeclaration(
+  a: {allergens?: string[]|null, severity?: string|null, cross_contact?: boolean|null, notes?: string|null},
+  b: {allergens: string[], severity: string, cross_contact: boolean, notes: string}
+): boolean {
+  const norm = (x?: string[]|null) => (x ?? []).map(v => String(v).trim().toLowerCase()).sort().join('\u0000')
+  return norm(a.allergens) === norm(b.allergens)
+    && (a.severity ?? '') === b.severity
+    && !!a.cross_contact === b.cross_contact
+    && ((a.notes ?? '').trim()) === b.notes.trim()
+}
+
 function maxSeverity(risks: string[]): string | null {
   let best: string | null = null;
   for (const r of risks) {
@@ -325,24 +339,66 @@ function App() {
     // only {unsure, discomfort, severe, anaphylaxis}, so it would have failed as an
     // opaque 23514 after the guest thought they had sent it.
     if (!severity) { setSubmitError('Please set a risk level for each allergy.'); return null }
-    // .select('id').single() so the declaration can be re-read by id afterwards. anon holds
-    // both the INSERT and SELECT grant, and the select policy qual
-    // (created_at >= now() - 36h) is satisfied by a row created moments ago.
-    const { data: row, error } = await supabase.from('allergen_declarations').insert({
-      venue_id: resolvedVenueId, asset_id: assetId,
+    const fields = {
       allergens: decl.map(d => d.name),
       severity,
       // Collected per allergen and shown back to the guest as a "Cross-Contact"
       // badge, but never persisted until now. some() is the safe reading: if the
       // guest flagged cross-contact on ANY allergen, the declaration carries it.
       cross_contact: decl.some(d => d.xc),
-      notes: allergenNotes || undefined,
-      guest_session_id: guestSessionId,
-      status: 'pending',
-      // Audit chain. NULL for a first declaration; on a correction it names the revision
-      // being replaced, so history is traversable in both directions.
-      supersedes_id: correcting ?? undefined,
-    }).select('id').single()
+      notes: allergenNotes || '',
+    }
+    // .select('id').single() so the declaration can be re-read by id afterwards. anon holds
+    // both the INSERT and SELECT grant, and the select policy qual
+    // (created_at >= now() - 36h) is satisfied by a row created moments ago.
+    // supersedes_id: NULL for a first declaration; on a correction it names the revision
+    // being replaced, so history is traversable in both directions.
+    const insertRevision = (supersedesId: string | null) =>
+      supabase.from('allergen_declarations').insert({
+        venue_id: resolvedVenueId, asset_id: assetId,
+        ...fields,
+        notes: fields.notes || undefined,
+        guest_session_id: guestSessionId,
+        status: 'pending',
+        supersedes_id: supersedesId ?? undefined,
+      }).select('id').single()
+
+    const markSuperseded = async (id: string) => {
+      const { error: e } = await supabase.from('allergen_declarations')
+        .update({ superseded_at: new Date().toISOString() }).eq('id', id)
+      // The correction itself is already durable; a failed marking is an audit-tidiness
+      // problem, not a safety one, and must not be reported to the guest as a failure.
+      // Consumers also derive supersession from the chain, so currency stays correct.
+      if (e) console.error('[tableside] supersede marking failed:', e)
+    }
+
+    let target = correcting
+    let { data: row, error } = await insertRevision(target)
+
+    // AMBIGUOUS-SUCCESS RECOVERY.
+    // A correction whose INSERT committed but whose response was lost leaves this client
+    // believing it failed. A retry would fork the chain — two rows superseding the same
+    // prior declaration, both current, no deterministic winner. That was reproduced against
+    // the live table and is now rejected by a unique index on supersedes_id, so the retry
+    // arrives here as 23505 and is resolved rather than duplicated.
+    if (error && (error as {code?: string}).code === '23505' && target) {
+      const { data: existing } = await supabase.from('allergen_declarations')
+        .select('id,allergens,severity,cross_contact,notes').eq('supersedes_id', target).maybeSingle()
+      if (existing) {
+        if (sameDeclaration(existing, fields)) {
+          // Identical retry: the earlier attempt IS this correction. Adopt it — idempotent,
+          // no second row, no fork.
+          row = { id: existing.id as string }; error = null
+        } else {
+          // Changed retry: the guest's latest intent must win, so extend the chain instead
+          // of forking it — the committed intermediate is superseded and kept as history.
+          await markSuperseded(target)
+          target = existing.id as string
+          const again = await insertRevision(target)
+          row = again.data; error = again.error
+        }
+      }
+    }
     // A failed declaration must fail toward a human. "Try again" alone leaves a guest with
     // an allergy believing the restaurant has something it does not.
     if (error) {
@@ -361,14 +417,8 @@ function App() {
     // that must never happen. This order's failure mode is two rows briefly un-superseded,
     // and the consumer resolves that safely by also treating a row as superseded when it is
     // named by another row's supersedes_id.
-    if (correcting) {
-      const { error: supErr } = await supabase.from('allergen_declarations')
-        .update({ superseded_at: new Date().toISOString() }).eq('id', correcting)
-      // The correction itself is already durable; a failed marking is an audit-tidiness
-      // problem, not a safety one, and must not be reported to the guest as a failed update.
-      if (supErr) console.error('[tableside] supersede marking failed:', supErr)
-    }
-    return { id: row.id as string, allergens: decl.map(d => d.name), severity }
+    if (target) await markSuperseded(target)
+    return { id: row!.id as string, allergens: fields.allergens, severity }
   }
 
   const submitSentiment = async (score: SentimentScore) => {
