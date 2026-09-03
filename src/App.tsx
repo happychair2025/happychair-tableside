@@ -124,6 +124,11 @@ function App() {
   // Timestamp of a DATABASE-PERSISTED kitchen_ack_at. Null means only "venue review has not
   // yet been proven" — never an error, and never a reason to retract the proven receipt.
   const [reviewedAt, setReviewedAt] = useState<string|null>(null)
+  // Id of the declaration a correction will supersede. Non-null only while the guest is
+  // editing a declaration Happy Chair has already accepted.
+  const [correcting, setCorrecting] = useState<string|null>(null)
+  // True once a correction has been accepted, so the receipt can say "updated".
+  const [wasCorrected, setWasCorrected] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [sentimentRowId, setSentimentRowId] = useState<string | null>(null)
   const [notesSubmitting, setNotesSubmitting] = useState(false)
@@ -301,7 +306,9 @@ function App() {
   const handleAllergenSubmit = async () => {
     if (!resolvedVenueId || !assetId || decl.length === 0) {
       // Previously a silent `return` that still navigated the guest to a success screen.
-      setSubmitError("We couldn't confirm your allergy declaration was received. Please tell your server about the allergy directly.")
+      setSubmitError(correcting
+        ? "We couldn't confirm your updated allergy declaration was received. Please tell your server about the change directly."
+        : "We couldn't confirm your allergy declaration was received. Please tell your server about the allergy directly.")
       return null
     }
     setSubmitError('')
@@ -332,15 +339,35 @@ function App() {
       notes: allergenNotes || undefined,
       guest_session_id: guestSessionId,
       status: 'pending',
+      // Audit chain. NULL for a first declaration; on a correction it names the revision
+      // being replaced, so history is traversable in both directions.
+      supersedes_id: correcting ?? undefined,
     }).select('id').single()
     // A failed declaration must fail toward a human. "Try again" alone leaves a guest with
     // an allergy believing the restaurant has something it does not.
     if (error) {
-      setSubmitError("We couldn't confirm your allergy declaration was received. Please tell your server about the allergy directly.")
+      // Nothing has been superseded at this point — the prior declaration is untouched and
+      // remains current and truthful. No partial replacement of current state.
+      setSubmitError(correcting
+        ? "We couldn't confirm your updated allergy declaration was received. Please tell your server about the change directly."
+        : "We couldn't confirm your allergy declaration was received. Please tell your server about the allergy directly.")
       return null
     }
     // Only the database accepting the row establishes receipt. Returned so the caller can
     // gate navigation on it — see trySubmit.
+    // Order is deliberate: the replacement is INSERTED FIRST, then the prior row is marked
+    // superseded. The reverse order would leave a window with no current declaration at all
+    // — the kitchen would briefly see no allergy for this guest, which is the one outcome
+    // that must never happen. This order's failure mode is two rows briefly un-superseded,
+    // and the consumer resolves that safely by also treating a row as superseded when it is
+    // named by another row's supersedes_id.
+    if (correcting) {
+      const { error: supErr } = await supabase.from('allergen_declarations')
+        .update({ superseded_at: new Date().toISOString() }).eq('id', correcting)
+      // The correction itself is already durable; a failed marking is an audit-tidiness
+      // problem, not a safety one, and must not be reported to the guest as a failed update.
+      if (supErr) console.error('[tableside] supersede marking failed:', supErr)
+    }
     return { id: row.id as string, allergens: decl.map(d => d.name), severity }
   }
 
@@ -520,7 +547,12 @@ function App() {
     const result = await handleAllergenSubmit()
     setSubmitting(false)
     if (!result) return          // stay put; submitError is rendered on this screen
+    // The venue-review state resets with the revision. A review of the PRIOR declaration
+    // cannot establish that the venue has seen this one, so the poll restarts against the
+    // new row id — whose kitchen_ack_at is null until the venue reviews the correction.
     setReviewedAt(null)
+    setWasCorrected(!!correcting)
+    setCorrecting(null)
     setReceipt(result)
     go('alwait')
   }
@@ -906,11 +938,14 @@ function App() {
                   the INSERT fails. It previously rendered only on the main screen, which a
                   submitting guest had already navigated away from — so the error existed in
                   the DOM of a screen nobody was looking at. */}
+              {/* Stated plainly, not as a warning: a corrected declaration is a new one, so
+                  the venue's earlier review cannot carry over to it. */}
+              {correcting && <div style={{color:'var(--t2)',background:'var(--s1)',border:'1px solid var(--b)',borderRadius:'8px',padding:'11px 14px',fontSize:'13px',lineHeight:1.5,textAlign:'center',margin:'0 0 10px'}}>Updating your declaration will require the restaurant to review it again.</div>}
               {submitError && <div style={{color:'#fca5a5',background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.25)',borderRadius:'8px',padding:'12px 14px',fontSize:'13px',lineHeight:1.5,textAlign:'center',margin:'0 0 10px'}}>{submitError}</div>}
               <button className="sbtn" onClick={trySubmit} disabled={submitting}>
                 {/* "Notify Staff" overstated what submission does — no staff-facing allergy
                     surface exists in the product. The button sends a declaration; it says so. */}
-                <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : 'Send Allergy Declaration'}
+                <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : correcting ? 'Send Updated Declaration' : 'Send Allergy Declaration'}
               </button>
             </div>
           </div>
@@ -934,10 +969,12 @@ function App() {
                   only by a database-persisted kitchen_ack_at. State 2 says REVIEW and nothing
                   more — no employee name (attribution is a device string until Track B), no
                   server notification, no preparation, no verification, no safety claim. */}
-              <div className="ot" style={{color:'#f59e0b'}}>{reviewedAt ? 'Reviewed by Venue' : 'Declaration Received'}</div>
+              <div className="ot" style={{color:'#f59e0b'}}>{reviewedAt ? 'Reviewed by Venue' : wasCorrected ? 'Update Received' : 'Declaration Received'}</div>
               <div className="os">{reviewedAt
                 ? `${venue?.name ?? 'The venue'} has reviewed your allergy declaration.`
-                : `Your allergy declaration was received by Happy Chair for ${venue?.name ?? 'this venue'}.`}</div>
+                : wasCorrected
+                  ? `Your updated allergy declaration was received by Happy Chair for ${venue?.name ?? 'this venue'}.`
+                  : `Your allergy declaration was received by Happy Chair for ${venue?.name ?? 'this venue'}.`}</div>
               {/* Faithful echo of what the database accepted — the guest's own allergen
                   names and their own severity wording from the picker (SEV[].l). No new
                   safety vocabulary is introduced here. */}
@@ -952,6 +989,15 @@ function App() {
                   </div>
                 </div>
               )}
+              {/* A correction does not edit the declaration Happy Chair holds — it creates a
+                  new current one and supersedes the old, which stays in the record along
+                  with every action taken against it. */}
+              <div
+                onClick={() => { if (receipt) { setCorrecting(receipt.id); go('allergy') } }}
+                style={{marginTop:'20px',fontSize:'14px',color:'var(--t2)',cursor:'pointer',textDecoration:'underline',textUnderlineOffset:'3px'}}
+              >
+                Something wrong? Update your declaration
+              </div>
             </div>
           </div>
         )}
