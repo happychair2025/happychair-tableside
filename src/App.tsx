@@ -160,6 +160,9 @@ function App() {
 
   // ── ALLERGY STATE ──
   const [decl, setDecl] = useState<Array<{name:string,risk:string,xc:boolean}>>([])
+  // The guest's first name, so the server looking after them knows who they are.
+  // Optional — a guest who does not want to give it still gets a full declaration.
+  const [guestFirstName, setGuestFirstName] = useState('')
   const [curAllergen, setCurAllergen] = useState<string|null>(null)
   const [curRisk, setCurRisk] = useState<string|null>(null)
   const [curXC, setCurXC] = useState(false)
@@ -317,6 +320,40 @@ function App() {
     if (error) { setSubmitError('Failed to send request. Please try again.'); return }
   }
 
+  /**
+   * ONE browser session at ONE table.
+   *
+   * This used to be `crypto.randomUUID()` computed inside the submit handler, so every
+   * submission — including a correction of the guest's own declaration — received a brand
+   * new value. The column was named guest_session_id but was functionally a second copy of
+   * the row id: 5 rows in production held 5 distinct values, and nothing could be grouped
+   * by it.
+   *
+   * Persisted in sessionStorage and keyed by table, it now means what its name says. It
+   * survives a page reload, so a guest who reloads and edits still edits THEIR declaration
+   * instead of silently creating a second one. It dies when the tab closes, which is the
+   * right lifetime: the next guest seated at that table is a different person and must get
+   * a different context.
+   *
+   * It is NOT an identity. It never crosses tables, never crosses devices, and is never
+   * used to decide that two declarations are the same human — only that they came from the
+   * same browser at the same table.
+   */
+  const guestSessionFor = (asset: string): string => {
+    const key = `hc_guest_session_${asset}`
+    try {
+      const existing = sessionStorage.getItem(key)
+      if (existing) return existing
+      const fresh = crypto.randomUUID()
+      sessionStorage.setItem(key, fresh)
+      return fresh
+    } catch {
+      // Private mode, storage disabled, or a browser that throws on access. Degrade to the
+      // previous per-submission behaviour rather than blocking the declaration.
+      return crypto.randomUUID()
+    }
+  }
+
   const handleAllergenSubmit = async () => {
     if (!resolvedVenueId || !assetId || decl.length === 0) {
       // Previously a silent `return` that still navigated the guest to a success screen.
@@ -326,7 +363,7 @@ function App() {
       return null
     }
     setSubmitError('')
-    const guestSessionId = crypto.randomUUID()
+    const guestSessionId = guestSessionFor(assetId)
     // Severity is the HIGHEST risk declared, not the first entered. Previously this
     // read decl[0]?.risk: a guest declaring lactose (discomfort) then peanut
     // (anaphylaxis) wrote 'discomfort'. The kitchen board gates its anaphylaxis
@@ -347,6 +384,9 @@ function App() {
       // guest flagged cross-contact on ANY allergen, the declaration carries it.
       cross_contact: decl.some(d => d.xc),
       notes: allergenNotes || '',
+      // Written to the existing guest_name column so a server sees "SP20 · Priya" rather
+      // than two indistinguishable cards for the same table.
+      guest_name: guestFirstName.trim() || null,
     }
     // .select('id').single() so the declaration can be re-read by id afterwards. anon holds
     // both the INSERT and SELECT grant, and the select policy qual
@@ -372,7 +412,25 @@ function App() {
       if (e) console.error('[tableside] supersede marking failed:', e)
     }
 
+    // `correcting` is React state and does not survive a reload. The durable session id
+    // does, so a guest who reloads and re-declares at the same table is recognised as
+    // editing their own declaration rather than adding a second guest's. A DIFFERENT
+    // session at this table is deliberately NOT matched here — that is a different guest
+    // context and gets its own independent workflow.
     let target = correcting
+    if (!target) {
+      const { data: mine } = await supabase.from('allergen_declarations')
+        .select('id')
+        .eq('asset_id', assetId)
+        .eq('guest_session_id', guestSessionId)
+        .is('superseded_at', null)
+        .is('served_at', null)
+        .is('closed_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (mine?.id) target = mine.id as string
+    }
     let { data: row, error } = await insertRevision(target)
 
     // AMBIGUOUS-SUCCESS RECOVERY.
@@ -977,6 +1035,21 @@ function App() {
                   </div>
                 </div>
               )}
+
+              {/* First name. Deliberately worded for the guest's benefit, not ours — no
+                  mention of records, sessions or revisions. */}
+              <div className="sec">Your First Name</div>
+              <input
+                className="nta"
+                style={{minHeight:'auto',height:'46px',resize:'none'}}
+                type="text"
+                inputMode="text"
+                autoComplete="given-name"
+                maxLength={40}
+                placeholder="Optional — so your server knows who to look after"
+                value={guestFirstName}
+                onChange={e => setGuestFirstName(e.target.value)}
+              />
 
               {/* Notes */}
               <div className="sec">What Else Should We Know?</div>
