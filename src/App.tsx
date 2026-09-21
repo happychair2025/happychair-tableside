@@ -163,13 +163,15 @@ function App() {
   // The guest's first name, so the server looking after them knows who they are.
   // Optional — a guest who does not want to give it still gets a full declaration.
   const [guestFirstName, setGuestFirstName] = useState('')
-  const [curAllergen, setCurAllergen] = useState<string|null>(null)
-  const [curRisk, setCurRisk] = useState<string|null>(null)
-  const [curXC, setCurXC] = useState(false)
+  // Index into `decl` of the allergy whose details are open for editing. There is no
+  // staging area any more: an allergy the guest has selected is ALREADY in the declaration,
+  // and this only says which one's severity/cross-contact panel is showing. A highlighted
+  // chip therefore always means "this is in my declaration", never "this is a candidate".
+  const [editingIdx, setEditingIdx] = useState<number|null>(null)
   const [allergenSearch, setAllergenSearch] = useState('')
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [allergenNotes, setAllergenNotes] = useState('')
-  const [submitHint, setSubmitHint] = useState(false)
+  const [submitHint, setSubmitHint] = useState('')
   const searchRef = useRef<HTMLDivElement>(null)
 
   // ── URGENT STATE ──
@@ -596,19 +598,36 @@ function App() {
   // ══════════════════════════════════════════════════════════════
   // ALLERGY HELPERS
   // ══════════════════════════════════════════════════════════════
+  /**
+   * Selecting an allergy puts it IN the declaration immediately and opens its details.
+   *
+   * The old flow staged a candidate and required a separate "Add" tap to commit it, so a
+   * guest swapping Tree Nuts for Peanuts had to remove, select, set severity, notice Add,
+   * then submit — and a highlighted chip looked identical whether or not the allergy was
+   * actually declared. Selection and inclusion are now the same act.
+   */
   const selectAllergen = (name: string) => {
-    if (decl.some(d => d.name === name)) return
-    setCurAllergen(name); setCurRisk(null); setCurXC(false)
+    const existing = decl.findIndex(d => d.name === name)
+    if (existing >= 0) { setEditingIdx(existing); return }
+    setDecl(prev => {
+      const next = [...prev, {name, risk: '', xc: false}]
+      setEditingIdx(next.length - 1)
+      return next
+    })
   }
 
-  const addToDecl = () => {
-    if (!curAllergen || !curRisk) return
-    setDecl(prev => [...prev, {name: curAllergen!, risk: curRisk!, xc: curXC}])
-    setCurAllergen(null); setCurRisk(null); setCurXC(false)
-    showToast('Added to declaration ✓')
+  /** Details are edited in place on the declared allergy — nothing to commit afterwards. */
+  const updateDecl = (idx: number, patch: Partial<{risk:string,xc:boolean}>) =>
+    setDecl(prev => prev.map((d,i) => i === idx ? {...d, ...patch} : d))
+
+  const removeDecl = (idx: number) => {
+    setDecl(prev => prev.filter((_,i) => i !== idx))
+    // Keep the open panel pointed at the same allergy, not at whatever slid into its index.
+    setEditingIdx(cur => cur === null ? null : cur === idx ? null : cur > idx ? cur - 1 : cur)
   }
 
-  const removeDecl = (idx: number) => setDecl(prev => prev.filter((_,i) => i !== idx))
+  /** Declared but with no severity chosen yet. Severity is per-allergen and never guessed. */
+  const incomplete = decl.filter(d => !d.risk)
 
   const searchResults = allergenSearch.length > 0
     ? ALLERGEN_DB.filter(a => a.n.toLowerCase().includes(allergenSearch.toLowerCase()) && !decl.some(d => d.name === a.n)).slice(0, 6)
@@ -644,7 +663,15 @@ function App() {
   }, [screen, receipt, reviewedAt])
 
   const trySubmit = async () => {
-    if (decl.length === 0) { setSubmitHint(true); setTimeout(() => setSubmitHint(false), 3000); return }
+    if (decl.length === 0) { setSubmitHint('Select at least one allergy above.'); setTimeout(() => setSubmitHint(''), 4000); return }
+    // Severity is per-allergen and there is no safe default, so an allergy without one
+    // blocks the whole declaration and says exactly which.
+    if (incomplete.length > 0) {
+      setEditingIdx(decl.findIndex(d => !d.risk))
+      setSubmitHint(`Choose how serious ${incomplete.map(d => d.name).join(' and ')} ${incomplete.length === 1 ? 'is' : 'are'} for you.`)
+      setTimeout(() => setSubmitHint(''), 5000)
+      return
+    }
     if (submitting) return
     // The receipt screen is reachable ONLY through a successful INSERT. Previously this
     // called handleAllergenSubmit() without awaiting it and then navigated
@@ -936,20 +963,26 @@ function App() {
               </div>
               <div className="ps">Select any allergies or add your own.</div>
 
-              {/* Declared allergens */}
+              {/* Your declaration. Every allergy the guest has selected is here the moment
+                  they select it — this list is what will be sent, and tapping a row reopens
+                  its details. Nothing is staged elsewhere waiting to be added. */}
               {decl.length > 0 && (
                 <div className="dl" style={{margin:'0 18px 16px'}}>
                   <div className="sec" style={{padding:0,marginBottom:'8px'}}>Your Allergies</div>
                   {decl.map((d, i) => {
-                    const sc = SEV_COLORS[d.risk] || '#94a3b8'
-                    const sb = SEV_BGS[d.risk] || 'rgba(148,163,184,.1)'
+                    const sc = SEV_COLORS[d.risk] || '#f59e0b'
+                    const sb = SEV_BGS[d.risk] || 'rgba(245,158,11,.1)'
                     const sl = SEV.find(s => s.v === d.risk)
                     return (
-                      <div className="di" key={i}>
+                      <div className={`di${editingIdx === i ? ' editing' : ''}`} key={d.name}
+                        onClick={() => setEditingIdx(editingIdx === i ? null : i)}>
                         <div className="di-n">{d.name}</div>
-                        <div className="di-b" style={{background:sb,border:`1px solid ${sc}`,color:sc}}>{sl?.l || '—'}</div>
+                        <div className="di-b" style={{background:sb,border:`1px solid ${sc}`,color:sc}}>
+                          {sl?.l || 'Tap to set severity'}
+                        </div>
                         {d.xc && <div className="di-xc">Cross-Contact</div>}
-                        <button className="di-rm" onClick={() => removeDecl(i)}>✕</button>
+                        <button className="di-rm" aria-label={`Remove ${d.name}`}
+                          onClick={e => { e.stopPropagation(); removeDecl(i) }}>✕</button>
                       </div>
                     )
                   })}
@@ -1000,24 +1033,36 @@ function App() {
               <div className="sec">Select Common Allergies</div>
               <div className="chips" style={{padding:'0 18px',marginBottom:'16px'}}>
                 {PRESETS.map(p => {
-                  const added = decl.some(d => d.name === p)
+                  const idx = decl.findIndex(d => d.name === p)
+                  const added = idx >= 0
+                  // Green + tick means IN the declaration. The old `on` state made a chip
+                  // look chosen while the allergy was not actually declared; there is no
+                  // such state any more. Tapping a declared chip reopens its details.
                   return (
-                    <button key={p} className={`chip${added ? ' added' : curAllergen === p ? ' on' : ''}`}
-                      onClick={() => !added && selectAllergen(p)}>
+                    <button key={p} className={`chip${added ? ' added' : ''}${editingIdx === idx && added ? ' editing' : ''}`}
+                      onClick={() => selectAllergen(p)}>
                       {p}{added ? ' ✓' : ''}
                     </button>
                   )
                 })}
               </div>
 
-              {/* Severity config */}
-              {curAllergen && (
+              {/* Details for the allergy currently open. It is already in the declaration
+                  above — this panel refines it in place, which is why there is no Add. The
+                  close control only collapses the panel; it commits nothing, so missing it
+                  cannot drop an allergy the guest selected. */}
+              {editingIdx !== null && decl[editingIdx] && (
                 <div className="cfg" style={{margin:'0 18px 16px'}}>
-                  <div className="cfg-t"><ShieldIcon size={16}/> {curAllergen}</div>
+                  <div className="cfg-hd">
+                    <div className="cfg-t"><ShieldIcon size={16}/> {decl[editingIdx].name}</div>
+                    <button className="cfg-x" aria-label="Close details" onClick={() => setEditingIdx(null)}>✕</button>
+                  </div>
+                  <div className="cfg-in">In your declaration — choose how serious it is.</div>
                   <div className="cfg-s">How Serious Is It? <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,opacity:.7}}>(Select One)</span></div>
                   <div className="rg">
                     {SEV.map(r => (
-                      <div key={r.v} className={`rk${curRisk === r.v ? ' on' : ''}`} data-v={r.v} onClick={() => setCurRisk(r.v)} style={{position:'relative',overflow:'hidden'}}>
+                      <div key={r.v} className={`rk${decl[editingIdx!].risk === r.v ? ' on' : ''}`} data-v={r.v}
+                        onClick={() => updateDecl(editingIdx!, {risk: r.v})} style={{position:'relative',overflow:'hidden'}}>
                         <div style={{position:'absolute',left:0,top:0,bottom:0,width:'4px',borderRadius:'4px 0 0 4px',background:r.c}}/>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                           <div><div className="rk-n">{r.l}</div><div className="rk-d">{r.d}</div></div>
@@ -1026,12 +1071,10 @@ function App() {
                       </div>
                     ))}
                   </div>
-                  <div className={`ccr${curXC ? ' on' : ''}`} onClick={() => setCurXC(!curXC)}>
-                    <div className="cck">{curXC && <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--bg)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="10 3 5 9 2 6"/></svg>}</div>
+                  <div className={`ccr${decl[editingIdx].xc ? ' on' : ''}`}
+                    onClick={() => updateDecl(editingIdx!, {xc: !decl[editingIdx!].xc})}>
+                    <div className="cck">{decl[editingIdx].xc && <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--bg)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="10 3 5 9 2 6"/></svg>}</div>
                     <div><div style={{fontSize:'13px',fontWeight:700}}>Avoid Cross-Contact</div><div style={{color:'var(--t2)',fontSize:'12px',marginTop:'2px'}}>Separate surfaces, utensils, and prep.</div></div>
-                  </div>
-                  <div style={{display:'flex',justifyContent:'flex-end'}}>
-                    <button className="cfg-a" disabled={!curRisk} onClick={addToDecl}>Add</button>
                   </div>
                 </div>
               )}
@@ -1056,7 +1099,7 @@ function App() {
               <textarea className="nta" placeholder="Example: severe if exposed to shared fryer oil, no cheese garnish." value={allergenNotes} onChange={e => setAllergenNotes(e.target.value)}/>
 
               {/* Submit */}
-              {submitHint && <div style={{color:'#f59e0b',fontSize:'12px',textAlign:'center',padding:'6px'}}>Select at least one allergen above.</div>}
+              {submitHint && <div style={{color:'#f59e0b',fontSize:'12px',textAlign:'center',padding:'6px'}}>{submitHint}</div>}
               {/* The failure message renders HERE, on the screen the guest is left on when
                   the INSERT fails. It previously rendered only on the main screen, which a
                   submitting guest had already navigated away from — so the error existed in
@@ -1068,7 +1111,7 @@ function App() {
               <button className="sbtn" onClick={trySubmit} disabled={submitting}>
                 {/* "Notify Staff" overstated what submission does — no staff-facing allergy
                     surface exists in the product. The button sends a declaration; it says so. */}
-                <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : correcting ? 'Send Updated Declaration' : 'Send Allergy Declaration'}
+                <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : correcting ? 'Update Declaration' : 'Send Allergy Declaration'}
               </button>
             </div>
           </div>
