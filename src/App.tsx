@@ -797,8 +797,18 @@ function App() {
             {/* Venue header */}
             <div className="vh">
               <div className="ib">{venue?.name?.charAt(0) || 'H'}</div>
-              <div className="vn">{venue?.name || 'Happy Bistro'}</div>
-              <div className="vt">{asset?.label || 'T1'} · {asset?.zone || 'Dining Room'}</div>
+              {/* The demo venue's name used to render here whenever the venue row had not
+                  loaded — so a guest at any restaurant could be shown "Happy Bistro" on
+                  their own table's screen. When we do not know whose dining room this is,
+                  the only honest thing to show is the product. */}
+              <div className="vn">{venue?.name || 'Happy Chair'}</div>
+              {/* Same defect, adjacent line: a guest whose table had not resolved was told
+                  they were at "T1 · Dining Room" — a table number that may not exist here,
+                  which they could then repeat to a server. Show the table only when we
+                  actually know it. */}
+              {(asset?.label || asset?.zone) && (
+                <div className="vt">{[asset?.label, asset?.zone].filter(Boolean).join(' · ')}</div>
+              )}
             </div>
 
             {/* Service buttons */}
