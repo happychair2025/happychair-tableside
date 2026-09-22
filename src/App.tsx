@@ -184,6 +184,20 @@ function App() {
   const [appVisible, setAppVisible] = useState(false)
 
   const params = new URLSearchParams(window.location.search)
+  /**
+   * PERMANENT PHYSICAL IDENTITY — /t/<opaque-code>.
+   *
+   * The code identifies an immutable service point. It carries no venue id, no table
+   * number and no restaurant name, so renaming any of those leaves the marker meaning
+   * exactly what it always meant. The hostname in front of it is configuration; only the
+   * code is identity.
+   *
+   * ?c= is accepted as an equivalent so the same string works if a link is ever pasted
+   * rather than scanned.
+   */
+  const pathCode = window.location.pathname.match(/^\/t\/([0-9A-Za-z]+)\/?$/)?.[1] ?? null
+  const permanentCode = (pathCode || params.get('c') || '').toUpperCase() || null
+
   const venueId = params.get('venue') || params.get('v')
   const tableParam = params.get('table') || params.get('t') || params.get('asset')
   const [assetId, setAssetId] = useState<string | null>(tableParam)
@@ -228,6 +242,28 @@ function App() {
   // SUPABASE DATA LOADING — PRESERVED EXACTLY
   // ══════════════════════════════════════════════════════════════
   useEffect(() => {
+    // A permanent code resolves through a server function that returns DISPLAY metadata
+    // only — never a venue id, an asset id or a code id. Nothing internal crosses to the
+    // guest, and there is no pattern to walk from one restaurant's code to another's.
+    if (permanentCode) {
+      ;(async () => {
+        setLoading(true)
+        const { data, error } = await supabase.rpc('resolve_service_point_code', { p_code: permanentCode })
+        const row = Array.isArray(data) ? data[0] : null
+        if (error || !row || !row.available) {
+          // Guest-safe. It never implies the restaurant has accepted anything.
+          setAppError('code_unavailable')
+          setLoading(false)
+          return
+        }
+        setVenue({ id: '', name: row.venue_name ?? '' })
+        setAsset({ label: row.table_label ?? '', zone: row.zone_name ?? '' } as never)
+        setAppError('code_recognised')
+        setLoading(false)
+      })()
+      return
+    }
+
     if (!tableParam) {
       setAppError('invalid_qr')
       setLoading(false)
@@ -271,6 +307,14 @@ function App() {
 
         setAssetId(assetResult.data.id)
         setAsset(assetResult.data)
+        // Which physical identifier the guest actually used. Legacy markers keep working
+        // and are counted, so we can later see what is still stuck to tables — without
+        // migrating anything or inventing permanent-code attribution for an old scan.
+        void supabase.rpc('record_legacy_scan', {
+          p_venue_id: resolvedVenueId,
+          p_asset_id: assetResult.data.id,
+          p_method: isUuid ? 'legacy_asset_uuid' : 'legacy_venue_table',
+        })
         setScreen('main')
         setLoading(false)
       } catch (err) {
@@ -732,6 +776,16 @@ function App() {
   if (appError) {
     const msgs: Record<string,{title:string,body:string}> = {
       invalid_qr: {title:'Invalid QR Code', body:'Please scan the QR code at your table again.'},
+      // A valid code for a service point that cannot take part in service right now —
+      // retired, replaced, not yet verified, or a table taken out of service. Honest, and
+      // careful not to suggest anything has been sent anywhere.
+      code_unavailable: {title:"Happy Chair isn't available at this table right now",
+        body:'Please ask your server for assistance.'},
+      // Phase 2A ships permanent identity and resolution. Guest actions keyed by a
+      // permanent code arrive with the guest flow, so a recognised marker says what is
+      // true rather than offering buttons that cannot work yet.
+      code_recognised: {title:'This table is recognised',
+        body:'Happy Chair service is not enabled for this marker yet. Please ask your server for assistance.'},
       venue_not_found: {title:'Venue Not Found', body:'We could not find this venue. Please alert your server.'},
       asset_not_found: {title:'Table Not Found', body:'Please scan the QR code at your table again or alert your server.'},
     }
