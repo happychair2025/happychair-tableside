@@ -1084,7 +1084,15 @@ function App() {
         {/* ══ ALLERGY ══ */}
         {screen === 'allergy' && (
           <div className="sc on" style={{position:'relative'}}>
-            <CloseX onClick={() => go('main')}/>
+            {/* One predictable way back, in the layout rather than floating over it. The
+                circle that used to sit here overlapped the title and the allergy list. */}
+            <div className="sc-head">
+              <button className="sc-back" onClick={() => go('main')} aria-label="Back">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+                Back
+              </button>
+              <span className="sc-head-title">Allergies</span>
+            </div>
             <div className="scr" style={{paddingTop:'14px'}}>
               {/* Shield + Title */}
               <div style={{textAlign:'center',marginBottom:'6px'}}>
@@ -1240,10 +1248,15 @@ function App() {
                   the venue's earlier review cannot carry over to it. */}
               {correcting && <div style={{color:'var(--t2)',background:'var(--s1)',border:'1px solid var(--b)',borderRadius:'8px',padding:'11px 14px',fontSize:'13px',lineHeight:1.5,textAlign:'center',margin:'0 0 10px'}}>Updating your declaration will require the restaurant to review it again.</div>}
               {submitError && <div style={{color:'#fca5a5',background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.25)',borderRadius:'8px',padding:'12px 14px',fontSize:'13px',lineHeight:1.5,textAlign:'center',margin:'0 0 10px'}}>{submitError}</div>}
+              {/* Says what the button does, in the guest's terms, without claiming anyone
+                  has read it yet — nobody has, at the moment they press it. */}
+              <div className="sbtn-note">
+                Happy Chair will send this to the restaurant.
+              </div>
               <button className="sbtn" onClick={trySubmit} disabled={submitting}>
-                {/* "Notify Staff" overstated what submission does — no staff-facing allergy
-                    surface exists in the product. The button sends a declaration; it says so. */}
-                <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : correcting ? 'Update Declaration' : 'Send Allergy Declaration'}
+                {/* "Declaration" is what Happy Chair calls the record internally. It is not
+                    what a guest at a table calls telling someone about a peanut allergy. */}
+                <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : 'Tell the Restaurant'}
               </button>
             </div>
           </div>
