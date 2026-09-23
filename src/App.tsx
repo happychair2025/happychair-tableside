@@ -147,6 +147,7 @@ function App() {
   const [sentimentRowId, setSentimentRowId] = useState<string | null>(null)
   const [notesSubmitting, setNotesSubmitting] = useState(false)
   const [appError, setAppError] = useState<string | null>(null)
+  const [rehearsal, setRehearsal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string|null>(null)
 
@@ -272,6 +273,10 @@ function App() {
         // service point itself.
         setVenue({ id: '', name: row.venue_name ?? '' })
         setAsset({ label: row.table_label ?? '', zone: row.zone_name ?? '' } as never)
+        // The restaurant is practising with this table before opening it to guests. Whoever
+        // is holding the phone is a member of staff, and everything they send is real — it
+        // is simply not a guest. Saying so is the only thing that keeps the two apart.
+        setRehearsal(row.service_mode === 'rehearsal')
         setScreen('main')
         setLoading(false)
       })()
@@ -891,6 +896,15 @@ function App() {
 
       {/* APP */}
       <div id="app" style={{opacity: appVisible ? 1 : 0, transition:'opacity .5s .15s'}}>
+
+        {/* The restaurant is rehearsing at this table. Shown on every screen, not just the
+            first, because whoever picks the phone up mid-flow has to know too. */}
+        {rehearsal && (
+          <div className="rehearsal-bar">
+            <span className="rehearsal-tag">REHEARSAL</span>
+            <span>This table is being tested by the restaurant. Requests go to real staff.</span>
+          </div>
+        )}
 
         {/* ══ MAIN ══ */}
         {screen === 'main' && (
