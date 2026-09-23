@@ -267,3 +267,101 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 .ptr.on{height:34px}
 .ptr.spin svg{animation:ptrspin .8s linear infinite}
 @keyframes ptrspin{to{transform:rotate(360deg)}}
+
+/* ══ GUIDED ALLERGY FLOW ══════════════════════════════════════════════════════
+   Semantic roles only. Every rule below names a role, never a level:
+     --role-action    primary action        (brand cyan — NEVER a severity)
+     --role-caution   severe reaction
+     --role-critical  anaphylaxis
+     --role-rehearsal practice context      (never urgency)
+   The two lower severities carry no hue at all, because they are not warnings.
+   Meaning is carried by words and by an explicit ✓ on the chosen option; colour only
+   reinforces the top two levels and is never the sole signal.
+
+   Declared here as roles so a light theme is a later redefinition of these names with no
+   component changes. No toggle is shipped. */
+:root{
+  --role-action:#22d3ee; --role-action-ink:#04222a;
+  --role-ok:#10b981; --role-caution:#f59e0b; --role-critical:#ef4444; --role-rehearsal:#c9adff;
+}
+
+/* One question per screen. Comfortable measure, generous targets, nothing crowded. */
+.stp{padding:18px 18px 28px;display:flex;flex-direction:column}
+.stp-q{font-size:24px;line-height:1.25;font-weight:700;color:var(--t1);letter-spacing:-.01em;margin:6px 0 8px}
+.stp-s{font-size:15px;line-height:1.55;color:var(--t2);margin:0 0 20px;max-width:34em}
+.stp-prog{font-size:12.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--t2);margin-bottom:6px}
+.stp-hint{font-size:13.5px;color:var(--t2);text-align:center;margin:10px 0 0}
+.stp-note{font-size:13px;line-height:1.5;color:var(--t2);background:var(--s1);border:1px solid var(--b);border-radius:10px;padding:12px 14px;margin:0 0 12px}
+.stp-err{font-size:13px;line-height:1.5;color:#fca5a5;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:12px 14px;margin:0 0 12px}
+
+/* Fields sized for a thumb, never smaller than 48px. */
+.fld{width:100%;min-height:52px;background:var(--s1);border:1px solid var(--b);border-radius:12px;
+  padding:14px 16px;font-size:17px;font-family:inherit;color:var(--t1);outline:none;margin-bottom:18px}
+.fld:focus{border-color:var(--role-action)}
+.fld--area{min-height:104px;resize:none;line-height:1.5}
+
+/* Choice rows. Full width, 1 decision, explicit selection — no auto-advance anywhere. */
+.opts{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
+.opt{display:flex;align-items:flex-start;gap:12px;width:100%;min-height:64px;text-align:left;
+  background:var(--s1);border:1.5px solid var(--b);border-radius:14px;padding:14px 16px;
+  font-family:inherit;color:var(--t1);cursor:pointer;transition:border-color .12s,background .12s}
+.opt-tick{flex-shrink:0;width:24px;height:24px;border-radius:50%;border:1.5px solid var(--b2);
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--bg);margin-top:1px}
+.opt-body{display:flex;flex-direction:column;gap:3px}
+.opt-l{font-size:16.5px;font-weight:700;line-height:1.3}
+.opt-d{font-size:14px;line-height:1.45;color:var(--t2)}
+/* Selected. The tick and the border carry it — the same treatment at every level, so
+   selection can never be confused with severity. */
+.opt.on{border-color:var(--role-action);background:rgba(34,211,238,.07)}
+.opt.on .opt-tick{background:var(--role-action);border-color:var(--role-action)}
+/* Reinforcement only, on the two levels that warrant it. The words already said it. */
+.opt--caution .opt-l{color:var(--role-caution)}
+.opt--critical .opt-l{color:var(--role-critical)}
+.opt--caution.on{border-color:var(--role-caution);background:rgba(245,158,11,.07)}
+.opt--caution.on .opt-tick{background:var(--role-caution);border-color:var(--role-caution)}
+.opt--critical.on{border-color:var(--role-critical);background:rgba(239,68,68,.07)}
+.opt--critical.on .opt-tick{background:var(--role-critical);border-color:var(--role-critical)}
+
+/* Allergen chips — selection happens on the control the guest touched. */
+.chip-tick{margin-right:6px;font-weight:700}
+.seld{margin:18px 0 6px}
+.seld-h{font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t2);margin-bottom:8px}
+.seld-i{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;
+  background:var(--s1);border:1px solid var(--b);border-radius:10px;padding:0 6px 0 14px;margin-bottom:8px;font-size:15px}
+/* Removal belongs to one allergen and looks like nothing else on the screen. */
+.seld-x{width:44px;height:44px;background:none;border:none;color:var(--t2);font-size:15px;cursor:pointer;border-radius:8px}
+.seld-x:hover{color:var(--t1);background:rgba(255,255,255,.05)}
+
+/* Review */
+.rv{background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+.rv-h{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--t2);margin-bottom:8px}
+.rv-v{font-size:16px;color:var(--t1);line-height:1.45}
+.rv-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.05)}
+.rv-row:first-of-type{border-top:none}
+.rv-n{font-size:16px;font-weight:600;color:var(--t1);flex:1}
+.rv-sev{font-size:14.5px;color:var(--t2)}
+.rv-e{background:none;border:none;color:var(--role-action);font-family:inherit;font-size:14px;font-weight:600;
+  cursor:pointer;min-height:44px;padding:0 8px;border-radius:8px}
+/* The single level the record actually carries, stated rather than implied. */
+.rv--sent{border-color:var(--b2)}
+.rv-sent{font-size:19px;font-weight:700;color:var(--t1);margin-bottom:6px}
+.rv-note{font-size:13.5px;line-height:1.5;color:var(--t2)}
+
+/* Secondary action — Skip. Present, obviously not the main path. */
+.lbtn{display:block;width:100%;min-height:48px;margin-top:10px;background:none;border:none;
+  color:var(--t2);font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;border-radius:10px}
+.lbtn:hover{color:var(--t1);background:rgba(255,255,255,.04)}
+
+.sbtn{min-height:54px;font-size:16px}
+.sbtn:disabled{opacity:.45;cursor:default}
+
+/* Rehearsal: full explanation once, then a pill that costs no vertical space. */
+.reh-mark{display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:.11em;color:var(--role-rehearsal);
+  border:1px solid rgba(168,130,255,.55);border-radius:6px;padding:4px 9px;margin-bottom:14px}
+.reh-pill{margin-left:auto;font-size:10.5px;font-weight:800;letter-spacing:.09em;color:var(--role-rehearsal);
+  border:1px solid rgba(168,130,255,.5);border-radius:5px;padding:3px 7px;white-space:nowrap}
+
+.sev-txt--caution{color:var(--role-caution)}
+.sev-txt--critical{color:var(--role-critical)}
+.sev-txt--plain{color:var(--t1)}

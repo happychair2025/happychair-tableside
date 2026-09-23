@@ -25,11 +25,21 @@ const ALLERGEN_DB = [
   {n:'Gelatin',c:'Meat'},{n:'Honey',c:'Other'},{n:'Alcohol',c:'Other'},
 ];
 const PRESETS = ['Milk','Eggs','Fish','Shellfish','Tree Nuts','Peanuts','Wheat','Soy','Sesame'];
+type AllergyStep = 'rehearsal' | 'name' | 'allergens' | 'severity' | 'cross' | 'note' | 'review'
+
+/**
+ * The four stored severity values are unchanged — only the words a guest reads.
+ *
+ * `tone` is a ROLE, not a colour: 'plain' carries no hue at all, because the two lower
+ * levels are not warnings and dressing them as warnings is untrue. Words carry the meaning
+ * on every level; colour only reinforces the top two, and nothing here is identifiable by
+ * colour alone.
+ */
 const SEV = [
-  {v:'unsure',l:'Not Sure',d:"I'm not certain",c:'#94a3b8',dots:'—'},
-  {v:'discomfort',l:'Causes Discomfort',d:'Mild reaction',c:'#22d3ee',dots:'●'},
-  {v:'severe',l:'Severe Reaction',d:'Serious response',c:'#f59e0b',dots:'● ●'},
-  {v:'anaphylaxis',l:'Anaphylaxis Risk',d:'Life-threatening',c:'#ef4444',dots:'● ● ●'},
+  {v:'unsure',      l:"I'm not sure",     d:"I don’t know how serious my reaction may be.", tone:'plain'},
+  {v:'discomfort',  l:'Mild reaction',    d:'Uncomfortable, but not life-threatening.',     tone:'plain'},
+  {v:'severe',      l:'Severe reaction',  d:'I can have a serious reaction.',               tone:'caution'},
+  {v:'anaphylaxis', l:'Anaphylaxis',      d:'Life-threatening.',                            tone:'critical'},
 ];
 // Ascending risk order, derived from SEV so the two can never drift apart.
 // A declaration carries ONE severity, but the guest sets a risk PER allergen — the
@@ -63,8 +73,6 @@ function maxSeverity(risks: string[]): string | null {
   }
   return best;
 }
-const SEV_COLORS: Record<string,string> = {unsure:'#94a3b8',discomfort:'#22d3ee',severe:'#f59e0b',anaphylaxis:'#ef4444'};
-const SEV_BGS: Record<string,string> = {unsure:'rgba(148,163,184,.1)',discomfort:'rgba(34,211,238,.1)',severe:'rgba(245,158,11,.1)',anaphylaxis:'rgba(239,68,68,.1)'};
 
 // ══════════════════════════════════════════════════════════════
 // SVG COMPONENTS
@@ -170,11 +178,30 @@ function App() {
   // staging area any more: an allergy the guest has selected is ALREADY in the declaration,
   // and this only says which one's severity/cross-contact panel is showing. A highlighted
   // chip therefore always means "this is in my declaration", never "this is a candidate".
-  const [editingIdx, setEditingIdx] = useState<number|null>(null)
+  /**
+   * THE GUIDED FLOW.
+   *
+   * One question per screen, in the order a guest can answer them. The long single page
+   * this replaces put the next required action below two sections the guest had already
+   * finished with, so the interface had to instruct ("Tap to set severity") rather than
+   * lead. Each step below owns exactly one decision and hands over to the next.
+   */
+  const [step, setStep] = useState<AllergyStep>('name')
+  /** Which allergy severity is being asked about — index into decl. */
+  const [sevIdx, setSevIdx] = useState(0)
+  /**
+   * One answer for the whole declaration, because the record holds one boolean. Asking it
+   * per allergy would imply a precision the row cannot keep. null = not answered yet, which
+   * is a flow state only — it is never submitted.
+   */
+  const [crossContact, setCrossContact] = useState<boolean|null>(null)
+  /** The rehearsal explanation is shown in full once, then lives in the header. */
+  const [rehearsalAck, setRehearsalAck] = useState(false)
+  /** Set when a step was opened from Review, so Continue returns there instead of onward. */
+  const [fromReview, setFromReview] = useState(false)
   const [allergenSearch, setAllergenSearch] = useState('')
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [allergenNotes, setAllergenNotes] = useState('')
-  const [submitHint, setSubmitHint] = useState('')
   const searchRef = useRef<HTMLDivElement>(null)
 
   // ── URGENT STATE ──
@@ -558,10 +585,10 @@ function App() {
     const fields = {
       allergens: decl.map(d => d.name),
       severity,
-      // Collected per allergen and shown back to the guest as a "Cross-Contact"
-      // badge, but never persisted until now. some() is the safe reading: if the
-      // guest flagged cross-contact on ANY allergen, the declaration carries it.
-      cross_contact: decl.some(d => d.xc),
+      // One question, one boolean — the shape the row has always had. It was previously
+      // gathered per allergen and OR'd at this point; asking it once is the same value
+      // arrived at honestly, and null is impossible here because submit refuses above.
+      cross_contact: crossContact === true,
       notes: allergenNotes || '',
       // Written to the existing guest_name column so a server sees "SP20 · Priya" rather
       // than two indistinguishable cards for the same table.
@@ -826,13 +853,8 @@ function App() {
    * actually declared. Selection and inclusion are now the same act.
    */
   const selectAllergen = (name: string) => {
-    const existing = decl.findIndex(d => d.name === name)
-    if (existing >= 0) { setEditingIdx(existing); return }
-    setDecl(prev => {
-      const next = [...prev, {name, risk: '', xc: false}]
-      setEditingIdx(next.length - 1)
-      return next
-    })
+    if (decl.some(d => d.name === name)) return   // already chosen; selection is idempotent
+    setDecl(prev => [...prev, {name, risk: '', xc: false}])
   }
 
   /** Details are edited in place on the declared allergy — nothing to commit afterwards. */
@@ -841,12 +863,71 @@ function App() {
 
   const removeDecl = (idx: number) => {
     setDecl(prev => prev.filter((_,i) => i !== idx))
-    // Keep the open panel pointed at the same allergy, not at whatever slid into its index.
-    setEditingIdx(cur => cur === null ? null : cur === idx ? null : cur > idx ? cur - 1 : cur)
+    // Keep the severity question pointed at a real allergy after one is taken out.
+    setSevIdx(cur => cur >= idx && cur > 0 ? cur - 1 : cur)
   }
 
   /** Declared but with no severity chosen yet. Severity is per-allergen and never guessed. */
   const incomplete = decl.filter(d => !d.risk)
+
+  /**
+   * Entering AllergyShield. The rehearsal explanation is shown in full the first time only;
+   * a correction re-enters at Review with everything the guest already said intact, so they
+   * change one thing rather than walk the whole flow again.
+   */
+  const openAllergyFlow = (correctingExisting: boolean) => {
+    setSevIdx(0)
+    setFromReview(false)
+    setStep(rehearsal && !rehearsalAck ? 'rehearsal'
+      : correctingExisting && decl.length > 0 ? 'review'
+      : 'name')
+  }
+
+  /** Advance. From an edit opened at Review, every step returns to Review. */
+  const advance = (from: AllergyStep) => {
+    if (fromReview) { setFromReview(false); setStep('review'); return }
+    if (from === 'rehearsal') { setRehearsalAck(true); setStep('name'); return }
+    if (from === 'name')      { setStep('allergens'); return }
+    if (from === 'allergens') { setSevIdx(0); setStep('severity'); return }
+    if (from === 'severity')  {
+      // One allergy at a time, in the order they were chosen.
+      if (sevIdx < decl.length - 1) { setSevIdx(sevIdx + 1); return }
+      setStep('cross'); return
+    }
+    if (from === 'cross')     { setStep('note'); return }
+    if (from === 'note')      { setStep('review'); return }
+  }
+
+  /** Back never discards anything the guest has entered. */
+  const back = () => {
+    if (fromReview) { setFromReview(false); setStep('review'); return }
+    if (step === 'name')      { go('main'); return }
+    if (step === 'allergens') { setStep('name'); return }
+    if (step === 'severity')  {
+      if (sevIdx > 0) { setSevIdx(sevIdx - 1); return }
+      setStep('allergens'); return
+    }
+    if (step === 'cross')     { setSevIdx(Math.max(0, decl.length - 1)); setStep('severity'); return }
+    if (step === 'note')      { setStep('cross'); return }
+    if (step === 'review')    { setStep('note'); return }
+    go('main')
+  }
+
+  /** Open one section from Review and come straight back to it. */
+  const editFromReview = (target: AllergyStep, idx = 0) => {
+    setFromReview(true); setSevIdx(idx); setStep(target)
+  }
+
+  /** The single level the record actually carries — shown to the guest, not hidden. */
+  const sentSeverity = maxSeverity(decl.map(d => d.risk))
+  const sevLabel = (v: string) => SEV.find(x => x.v === v)?.l ?? ''
+
+  // Keyboard-aware: bring the focused field AND its action into the visible viewport
+  // together, so the thing to press next is never behind the keyboard.
+  const keepInView = (e: React.FocusEvent<HTMLElement>) => {
+    const el = e.currentTarget
+    setTimeout(() => el.closest('.stp')?.scrollIntoView({ block: 'end', behavior: 'smooth' }), 250)
+  }
 
   const searchResults = allergenSearch.length > 0
     ? ALLERGEN_DB.filter(a => a.n.toLowerCase().includes(allergenSearch.toLowerCase()) && !decl.some(d => d.name === a.n)).slice(0, 6)
@@ -889,15 +970,17 @@ function App() {
   }, [screen, receipt, reviewedAt])
 
   const trySubmit = async () => {
-    if (decl.length === 0) { setSubmitHint('Select at least one allergy above.'); setTimeout(() => setSubmitHint(''), 4000); return }
+    if (decl.length === 0) { setStep('allergens'); return }
+    if (!guestFirstName.trim()) { setFromReview(true); setStep('name'); return }
     // Severity is per-allergen and there is no safe default, so an allergy without one
-    // blocks the whole declaration and says exactly which.
+    // blocks the whole declaration — and sends the guest to that exact question.
     if (incomplete.length > 0) {
-      setEditingIdx(decl.findIndex(d => !d.risk))
-      setSubmitHint(`Choose how serious ${incomplete.map(d => d.name).join(' and ')} ${incomplete.length === 1 ? 'is' : 'are'} for you.`)
-      setTimeout(() => setSubmitHint(''), 5000)
+      setFromReview(true)
+      setSevIdx(decl.findIndex(d => !d.risk))
+      setStep('severity')
       return
     }
+    if (crossContact === null) { setFromReview(true); setStep('cross'); return }
     if (submitting) return
     // The receipt screen is reachable ONLY through a successful INSERT. Previously this
     // called handleAllergenSubmit() without awaiting it and then navigated
@@ -1076,7 +1159,7 @@ function App() {
 
             {/* Escalation */}
             <div className="esc">
-              <button className="eb" onClick={() => go('allergy')}>
+              <button className="eb" onClick={() => { openAllergyFlow(false); go('allergy') }}>
                 <ShieldIcon size={16}/> Food Allergy
               </button>
             </div>
@@ -1204,188 +1287,272 @@ function App() {
           </div>
         )}
 
-        {/* ══ ALLERGY ══ */}
+        {/* ══ ALLERGY — GUIDED FLOW ══ */}
         {screen === 'allergy' && (
-          <div className="sc on" style={{position:'relative'}}>
-            {/* One predictable way back, in the layout rather than floating over it. The
-                circle that used to sit here overlapped the title and the allergy list. */}
+          <div className="sc on">
+            {/* The only persistent region. Back, where the guest is, and — while the venue
+                is rehearsing — a compact marker that costs no vertical space. */}
             <div className="sc-head">
-              <button className="sc-back" onClick={() => go('main')} aria-label="Back">
+              <button className="sc-back" onClick={back} aria-label="Back">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
                 Back
               </button>
-              <span className="sc-head-title">Allergies</span>
+              <span className="sc-head-title">
+                {step === 'severity' && decl.length > 1
+                  ? `${sevIdx + 1} of ${decl.length}`
+                  : step === 'review' ? 'Review' : 'Allergies'}
+              </span>
+              {rehearsal && <span className="reh-pill">REHEARSAL</span>}
             </div>
-            <div className="scr" style={{paddingTop:'14px'}}>
+
+            <div className="scr">
               <div className={`ptr${refreshing ? ' on spin' : ''}`}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                   strokeWidth="2" strokeLinecap="round"><path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/></svg>
                 {refreshing ? 'Checking with the restaurant…' : 'Release to refresh'}
               </div>
-              {/* Shield + Title */}
-              <div style={{textAlign:'center',marginBottom:'6px'}}>
-                <div style={{width:'56px',height:'56px',background:'rgba(245,158,11,.08)',border:'2px solid #f59e0b',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px'}}>
-                  <ShieldIcon size={24}/>
-                </div>
-                <div className="pt" style={{justifyContent:'center'}}>Tell Us About Your Allergies</div>
-              </div>
-              <div className="ps">Select any allergies or add your own.</div>
 
-              {/* Your declaration. Every allergy the guest has selected is here the moment
-                  they select it — this list is what will be sent, and tapping a row reopens
-                  its details. Nothing is staged elsewhere waiting to be added. */}
-              {decl.length > 0 && (
-                <div className="dl" style={{margin:'0 18px 16px'}}>
-                  <div className="sec" style={{padding:0,marginBottom:'8px'}}>Your Allergies</div>
-                  {decl.map((d, i) => {
-                    const sc = SEV_COLORS[d.risk] || '#f59e0b'
-                    const sb = SEV_BGS[d.risk] || 'rgba(245,158,11,.1)'
-                    const sl = SEV.find(s => s.v === d.risk)
-                    return (
-                      <div className={`di${editingIdx === i ? ' editing' : ''}`} key={d.name}
-                        onClick={() => setEditingIdx(editingIdx === i ? null : i)}>
-                        <div className="di-n">{d.name}</div>
-                        <div className="di-b" style={{background:sb,border:`1px solid ${sc}`,color:sc}}>
-                          {sl?.l || 'Tap to set severity'}
-                        </div>
-                        {d.xc && <div className="di-xc">Cross-Contact</div>}
-                        <button className="di-rm" aria-label={`Remove ${d.name}`}
-                          onClick={e => { e.stopPropagation(); removeDecl(i) }}>✕</button>
-                      </div>
-                    )
-                  })}
+              {/* ── 0 · REHEARSAL, in full, once ── */}
+              {step === 'rehearsal' && (
+                <div className="stp">
+                  <div className="reh-mark">REHEARSAL</div>
+                  <h1 className="stp-q">The restaurant is practising at this table.</h1>
+                  <p className="stp-s">
+                    Everything you send is real and reaches real staff. There is simply no
+                    guest order behind it.
+                  </p>
+                  <button className="sbtn" onClick={() => advance('rehearsal')}>Got it</button>
                 </div>
               )}
 
-              {/* Search */}
-              <div className="sec">Search Allergies</div>
-              <div className="srw" ref={searchRef}>
-                <svg className="sri" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input className="srb" type="text" placeholder="Search — butter, fish stock, gluten..." maxLength={60} autoComplete="off"
-                  value={allergenSearch}
-                  onChange={e => { setAllergenSearch(e.target.value); setShowSearchResults(true) }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && allergenSearch.trim()) {
-                      const match = ALLERGEN_DB.find(a => a.n.toLowerCase() === allergenSearch.toLowerCase())
-                      if (match) selectAllergen(match.n)
-                      else { selectAllergen(allergenSearch.charAt(0).toUpperCase() + allergenSearch.slice(1)); showToast(`"${allergenSearch}" — will be reviewed for database`) }
-                      setAllergenSearch(''); setShowSearchResults(false)
-                    }
-                  }}
-                />
-                {showSearchResults && allergenSearch.length > 0 && (
-                  <div className="srl open">
-                    {searchResults.map(m => (
-                      <div className="srl-i" key={m.n} onClick={() => { selectAllergen(m.n); setAllergenSearch(''); setShowSearchResults(false) }}>
-                        <span className="srl-n">{m.n}</span><span className="srl-c">{m.c}</span>
+              {/* ── 1 · FIRST NAME ── */}
+              {step === 'name' && (
+                <div className="stp">
+                  <h1 className="stp-q">What&rsquo;s your first name?</h1>
+                  <p className="stp-s">So the restaurant knows who to look after.</p>
+                  <input
+                    className="fld" type="text" inputMode="text" autoComplete="given-name"
+                    maxLength={40} placeholder="First name" value={guestFirstName}
+                    onFocus={keepInView}
+                    onChange={e => setGuestFirstName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur() }}
+                  />
+                  <button
+                    className="sbtn" disabled={!guestFirstName.trim()}
+                    onClick={e => {
+                      // Dismiss the keyboard BEFORE moving, so the next screen is not drawn
+                      // into a viewport that is about to change size under it.
+                      ;(e.currentTarget as HTMLButtonElement).blur()
+                      const f = document.querySelector('.fld') as HTMLElement | null
+                      f?.blur()
+                      setTimeout(() => advance('name'), 60)
+                    }}>
+                    Continue
+                  </button>
+                  {!guestFirstName.trim() && <p className="stp-hint">Please add your first name to continue.</p>}
+                </div>
+              )}
+
+              {/* ── 2 · ALLERGENS ── */}
+              {step === 'allergens' && (
+                <div className="stp">
+                  <h1 className="stp-q">What are you allergic to?</h1>
+                  <p className="stp-s">Choose as many as you need.</p>
+
+                  <div className="srw" ref={searchRef}>
+                    <svg className="sri" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input className="srb" type="text" placeholder="Search — butter, fish stock, gluten…" maxLength={60} autoComplete="off"
+                      value={allergenSearch}
+                      onFocus={keepInView}
+                      onChange={e => { setAllergenSearch(e.target.value); setShowSearchResults(true) }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && allergenSearch.trim()) {
+                          const match = ALLERGEN_DB.find(a => a.n.toLowerCase() === allergenSearch.toLowerCase())
+                          if (match) selectAllergen(match.n)
+                          else { selectAllergen(allergenSearch.charAt(0).toUpperCase() + allergenSearch.slice(1)); showToast(`"${allergenSearch}" — will be reviewed for database`) }
+                          setAllergenSearch(''); setShowSearchResults(false)
+                        }
+                      }}
+                    />
+                    {showSearchResults && allergenSearch.length > 0 && (
+                      <div className="srl open">
+                        {searchResults.map(m => (
+                          <div className="srl-i" key={m.n} onClick={() => { selectAllergen(m.n); setAllergenSearch(''); setShowSearchResults(false) }}>
+                            <span className="srl-n">{m.n}</span><span className="srl-c">{m.c}</span>
+                          </div>
+                        ))}
+                        {!ALLERGEN_DB.some(a => a.n.toLowerCase() === allergenSearch.toLowerCase()) && allergenSearch.length > 1 && (
+                          <div className="srl-new" onClick={() => {
+                            const cap = allergenSearch.charAt(0).toUpperCase() + allergenSearch.slice(1)
+                            selectAllergen(cap); setAllergenSearch(''); setShowSearchResults(false)
+                            showToast(`"${cap}" — will be reviewed for database`)
+                          }}>
+                            Add &ldquo;{allergenSearch.charAt(0).toUpperCase() + allergenSearch.slice(1)}&rdquo;
+                          </div>
+                        )}
                       </div>
-                    ))}
-                    {!ALLERGEN_DB.some(a => a.n.toLowerCase() === allergenSearch.toLowerCase()) && allergenSearch.length > 1 && (
-                      <div className="srl-new" onClick={() => {
-                        const cap = allergenSearch.charAt(0).toUpperCase() + allergenSearch.slice(1)
-                        selectAllergen(cap); setAllergenSearch(''); setShowSearchResults(false)
-                        showToast(`"${cap}" — will be reviewed for database`)
-                      }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        Add "{allergenSearch.charAt(0).toUpperCase() + allergenSearch.slice(1)}" as custom
-                      </div>
-                    )}
-                    {searchResults.length === 0 && ALLERGEN_DB.some(a => a.n.toLowerCase() === allergenSearch.toLowerCase()) === false && allergenSearch.length <= 1 && (
-                      <div style={{padding:'11px 14px',fontSize:'13px',color:'var(--t2)'}}>Keep typing...</div>
                     )}
                   </div>
-                )}
-              </div>
 
-              {/* Common chips */}
-              <div className="sec">Select Common Allergies</div>
-              <div className="chips" style={{padding:'0 18px',marginBottom:'16px'}}>
-                {PRESETS.map(p => {
-                  const idx = decl.findIndex(d => d.name === p)
-                  const added = idx >= 0
-                  // Green + tick means IN the declaration. The old `on` state made a chip
-                  // look chosen while the allergy was not actually declared; there is no
-                  // such state any more. Tapping a declared chip reopens its details.
-                  return (
-                    <button key={p} className={`chip${added ? ' added' : ''}${editingIdx === idx && added ? ' editing' : ''}`}
-                      onClick={() => selectAllergen(p)}>
-                      {p}{added ? ' ✓' : ''}
+                  {/* Selection happens on the control the guest touched. Nothing opens
+                      elsewhere and nothing has to be found. */}
+                  <div className="chips">
+                    {PRESETS.map(p => {
+                      const added = decl.some(d => d.name === p)
+                      return (
+                        <button key={p} className={`chip${added ? ' added' : ''}`}
+                          aria-pressed={added}
+                          onClick={() => {
+                            const i = decl.findIndex(d => d.name === p)
+                            if (i >= 0) removeDecl(i); else selectAllergen(p)
+                          }}>
+                          {added && <span className="chip-tick" aria-hidden="true">✓</span>}{p}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {decl.length > 0 && (
+                    <div className="seld">
+                      <div className="seld-h">Selected</div>
+                      {decl.map((d, i) => (
+                        <div className="seld-i" key={d.name}>
+                          <span>{d.name}</span>
+                          <button className="seld-x" aria-label={`Remove ${d.name}`}
+                            onClick={() => removeDecl(i)}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <button className="sbtn" disabled={decl.length === 0} onClick={() => advance('allergens')}>
+                    Continue{decl.length > 0 ? ` (${decl.length})` : ''}
+                  </button>
+                  {decl.length === 0 && <p className="stp-hint">Choose at least one to continue.</p>}
+                </div>
+              )}
+
+              {/* ── 3 · SEVERITY, one allergy at a time ── */}
+              {step === 'severity' && decl[sevIdx] && (
+                <div className="stp">
+                  {decl.length > 1 && <div className="stp-prog">{sevIdx + 1} of {decl.length}</div>}
+                  <h1 className="stp-q">How serious is your {decl[sevIdx].name.toLowerCase()} allergy?</h1>
+                  <div className="opts">
+                    {SEV.map(r => {
+                      const on = decl[sevIdx].risk === r.v
+                      return (
+                        <button key={r.v} className={`opt opt--${r.tone}${on ? ' on' : ''}`}
+                          aria-pressed={on}
+                          onClick={() => updateDecl(sevIdx, { risk: r.v })}>
+                          <span className="opt-tick" aria-hidden="true">{on ? '✓' : ''}</span>
+                          <span className="opt-body">
+                            <span className="opt-l">{r.l}</span>
+                            <span className="opt-d">{r.d}</span>
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {/* Deliberately not auto-advancing: this is a safety answer and the guest
+                      confirms it. */}
+                  <button className="sbtn" disabled={!decl[sevIdx].risk} onClick={() => advance('severity')}>
+                    Continue
+                  </button>
+                  {!decl[sevIdx].risk && <p className="stp-hint">Choose one to continue.</p>}
+                </div>
+              )}
+
+              {/* ── 4 · CROSS-CONTACT, its own question ── */}
+              {step === 'cross' && (
+                <div className="stp">
+                  <h1 className="stp-q">Do you need the restaurant to avoid cross-contact?</h1>
+                  <p className="stp-s">
+                    This means keeping your food away from the allergen during preparation,
+                    including shared surfaces, utensils or equipment.
+                  </p>
+                  <div className="opts">
+                    <button className={`opt${crossContact === true ? ' on' : ''}`}
+                      aria-pressed={crossContact === true} onClick={() => setCrossContact(true)}>
+                      <span className="opt-tick" aria-hidden="true">{crossContact === true ? '✓' : ''}</span>
+                      <span className="opt-body"><span className="opt-l">Yes, avoid cross-contact</span></span>
                     </button>
-                  )
-                })}
-              </div>
-
-              {/* Details for the allergy currently open. It is already in the declaration
-                  above — this panel refines it in place, which is why there is no Add. The
-                  close control only collapses the panel; it commits nothing, so missing it
-                  cannot drop an allergy the guest selected. */}
-              {editingIdx !== null && decl[editingIdx] && (
-                <div className="cfg" style={{margin:'0 18px 16px'}}>
-                  <div className="cfg-hd">
-                    <div className="cfg-t"><ShieldIcon size={16}/> {decl[editingIdx].name}</div>
-                    <button className="cfg-x" aria-label="Close details" onClick={() => setEditingIdx(null)}>✕</button>
+                    <button className={`opt${crossContact === false ? ' on' : ''}`}
+                      aria-pressed={crossContact === false} onClick={() => setCrossContact(false)}>
+                      <span className="opt-tick" aria-hidden="true">{crossContact === false ? '✓' : ''}</span>
+                      <span className="opt-body"><span className="opt-l">No</span></span>
+                    </button>
                   </div>
-                  <div className="cfg-in">In your declaration — choose how serious it is.</div>
-                  <div className="cfg-s">How Serious Is It? <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,opacity:.7}}>(Select One)</span></div>
-                  <div className="rg">
-                    {SEV.map(r => (
-                      <div key={r.v} className={`rk${decl[editingIdx!].risk === r.v ? ' on' : ''}`} data-v={r.v}
-                        onClick={() => updateDecl(editingIdx!, {risk: r.v})} style={{position:'relative',overflow:'hidden'}}>
-                        <div style={{position:'absolute',left:0,top:0,bottom:0,width:'4px',borderRadius:'4px 0 0 4px',background:r.c}}/>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                          <div><div className="rk-n">{r.l}</div><div className="rk-d">{r.d}</div></div>
-                          <div style={{color:r.c,fontSize:'10px',letterSpacing:'2px'}}>{r.dots}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className={`ccr${decl[editingIdx].xc ? ' on' : ''}`}
-                    onClick={() => updateDecl(editingIdx!, {xc: !decl[editingIdx!].xc})}>
-                    <div className="cck">{decl[editingIdx].xc && <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--bg)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="10 3 5 9 2 6"/></svg>}</div>
-                    <div><div style={{fontSize:'13px',fontWeight:700}}>Avoid Cross-Contact</div><div style={{color:'var(--t2)',fontSize:'12px',marginTop:'2px'}}>Separate surfaces, utensils, and prep.</div></div>
-                  </div>
+                  <button className="sbtn" disabled={crossContact === null} onClick={() => advance('cross')}>
+                    Continue
+                  </button>
+                  {crossContact === null && <p className="stp-hint">Choose one to continue.</p>}
                 </div>
               )}
 
-              {/* First name. Deliberately worded for the guest's benefit, not ours — no
-                  mention of records, sessions or revisions. */}
-              <div className="sec">Your First Name</div>
-              <input
-                className="nta"
-                style={{minHeight:'auto',height:'46px',resize:'none'}}
-                type="text"
-                inputMode="text"
-                autoComplete="given-name"
-                maxLength={40}
-                placeholder="Optional — so your server knows who to look after"
-                value={guestFirstName}
-                onChange={e => setGuestFirstName(e.target.value)}
-              />
+              {/* ── 5 · ANYTHING ELSE ── */}
+              {step === 'note' && (
+                <div className="stp">
+                  <h1 className="stp-q">Anything else the restaurant should know?</h1>
+                  <p className="stp-s">Optional.</p>
+                  <textarea className="fld fld--area" value={allergenNotes}
+                    onFocus={keepInView}
+                    placeholder="Example: I react to shared fryer oil."
+                    onChange={e => setAllergenNotes(e.target.value)}/>
+                  <button className="sbtn" onClick={() => advance('note')}>Continue</button>
+                  <button className="lbtn" onClick={() => { setAllergenNotes(''); advance('note') }}>Skip</button>
+                </div>
+              )}
 
-              {/* Notes */}
-              <div className="sec">What Else Should We Know?</div>
-              <textarea className="nta" placeholder="Example: severe if exposed to shared fryer oil, no cheese garnish." value={allergenNotes} onChange={e => setAllergenNotes(e.target.value)}/>
+              {/* ── 6 · REVIEW ── */}
+              {step === 'review' && (
+                <div className="stp">
+                  <h1 className="stp-q">Review what you&rsquo;re telling the restaurant</h1>
 
-              {/* Submit */}
-              {submitHint && <div style={{color:'#f59e0b',fontSize:'12px',textAlign:'center',padding:'6px'}}>{submitHint}</div>}
-              {/* The failure message renders HERE, on the screen the guest is left on when
-                  the INSERT fails. It previously rendered only on the main screen, which a
-                  submitting guest had already navigated away from — so the error existed in
-                  the DOM of a screen nobody was looking at. */}
-              {/* Stated plainly, not as a warning: a corrected declaration is a new one, so
-                  the venue's earlier review cannot carry over to it. */}
-              {correcting && <div style={{color:'var(--t2)',background:'var(--s1)',border:'1px solid var(--b)',borderRadius:'8px',padding:'11px 14px',fontSize:'13px',lineHeight:1.5,textAlign:'center',margin:'0 0 10px'}}>Updating your declaration will require the restaurant to review it again.</div>}
-              {submitError && <div style={{color:'#fca5a5',background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.25)',borderRadius:'8px',padding:'12px 14px',fontSize:'13px',lineHeight:1.5,textAlign:'center',margin:'0 0 10px'}}>{submitError}</div>}
-              {/* Says what the button does, in the guest's terms, without claiming anyone
-                  has read it yet — nobody has, at the moment they press it. */}
-              <div className="sbtn-note">
-                Happy Chair will send this to the restaurant.
-              </div>
-              <button className="sbtn" onClick={trySubmit} disabled={submitting}>
-                {/* "Declaration" is what Happy Chair calls the record internally. It is not
-                    what a guest at a table calls telling someone about a peanut allergy. */}
-                <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : 'Tell the Restaurant'}
-              </button>
+                  <div className="rv">
+                    <div className="rv-h">Your name<button className="rv-e" onClick={() => editFromReview('name')}>Edit</button></div>
+                    <div className="rv-v">{guestFirstName.trim() || '—'}</div>
+                  </div>
+
+                  <div className="rv">
+                    <div className="rv-h">What you told us<button className="rv-e" onClick={() => editFromReview('allergens')}>Edit</button></div>
+                    {decl.map((d, i) => (
+                      <div className="rv-row" key={d.name}>
+                        <span className="rv-n">{d.name}</span>
+                        <span className="rv-sev">{sevLabel(d.risk) || 'Not set'}</span>
+                        <button className="rv-e" onClick={() => editFromReview('severity', i)}>Edit</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rv">
+                    <div className="rv-h">Cross-contact<button className="rv-e" onClick={() => editFromReview('cross')}>Edit</button></div>
+                    <div className="rv-v">{crossContact === true ? 'Yes, avoid cross-contact' : crossContact === false ? 'No' : '—'}</div>
+                  </div>
+
+                  <div className="rv">
+                    <div className="rv-h">Anything else<button className="rv-e" onClick={() => editFromReview('note')}>Edit</button></div>
+                    <div className="rv-v">{allergenNotes.trim() || 'Nothing added'}</div>
+                  </div>
+
+                  {/* The record holds ONE level for the whole thing. Said out loud rather
+                      than left for the guest to discover, or not discover. */}
+                  <div className="rv rv--sent">
+                    <div className="rv-h">What the restaurant is told</div>
+                    <div className="rv-sent">{sevLabel(sentSeverity || '') || '—'}</div>
+                    <div className="rv-note">
+                      Happy Chair sends one level for your table — the most serious one you chose.
+                    </div>
+                  </div>
+
+                  {correcting && <div className="stp-note">Updating this will mean the restaurant looks at it again.</div>}
+                  {submitError && <div className="stp-err">{submitError}</div>}
+
+                  <div className="sbtn-note">Happy Chair will send this to the restaurant.</div>
+                  <button className="sbtn" onClick={trySubmit} disabled={submitting}>
+                    <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : 'Tell the Restaurant'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1422,7 +1589,7 @@ function App() {
                   <div style={{fontSize:'15px',fontWeight:600,color:'var(--t1)',textAlign:'center',lineHeight:1.5}}>
                     {receipt.allergens.join(', ')}
                     <span style={{color:'var(--t2)',margin:'0 6px'}}>·</span>
-                    <span style={{color: SEV.find(x => x.v === receipt.severity)?.c ?? 'var(--t1)'}}>
+                    <span className={`sev-txt sev-txt--${SEV.find(x => x.v === receipt.severity)?.tone ?? 'plain'}`}>
                       {SEV.find(x => x.v === receipt.severity)?.l ?? receipt.severity}
                     </span>
                   </div>
@@ -1432,7 +1599,7 @@ function App() {
                   new current one and supersedes the old, which stays in the record along
                   with every action taken against it. */}
               <div
-                onClick={() => { if (receipt) { setCorrecting(receipt.id); go('allergy') } }}
+                onClick={() => { if (receipt) { setCorrecting(receipt.id); openAllergyFlow(true); go('allergy') } }}
                 style={{marginTop:'20px',fontSize:'14px',color:'var(--t2)',cursor:'pointer',textDecoration:'underline',textUnderlineOffset:'3px'}}
               >
                 Something wrong? Update your declaration
