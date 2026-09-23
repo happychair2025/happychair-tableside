@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from './lib/supabase'
 import type {
   Venue,
@@ -148,6 +148,8 @@ function App() {
   const [notesSubmitting, setNotesSubmitting] = useState(false)
   const [appError, setAppError] = useState<string | null>(null)
   const [rehearsal, setRehearsal] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const refreshInFlight = useRef(false)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string|null>(null)
 
@@ -238,6 +240,127 @@ function App() {
     const t1 = setTimeout(() => { setShowSplash(false); setAppVisible(true) }, 2600)
     return () => clearTimeout(t1)
   }, [])
+
+  /**
+   * The visible height, measured.
+   *
+   * dvh covers this on Safari 15.4 and up; below that it falls back to vh, which is the
+   * height with the toolbars HIDDEN, and the bottom of the app ends up behind the toolbar
+   * where nothing can scroll to it. visualViewport reports what is actually visible right
+   * now, including while the toolbars are collapsing and while the keyboard is open, so the
+   * app box always matches the area the guest can see. Nothing here assumes a device size.
+   */
+  useEffect(() => {
+    const vv = window.visualViewport
+    const apply = () => {
+      const h = vv?.height ?? window.innerHeight
+      if (h > 0) document.documentElement.style.setProperty('--app-h', `${Math.round(h)}px`)
+    }
+    apply()
+    vv?.addEventListener('resize', apply)
+    vv?.addEventListener('scroll', apply)
+    window.addEventListener('resize', apply)
+    window.addEventListener('orientationchange', apply)
+    return () => {
+      vv?.removeEventListener('resize', apply)
+      vv?.removeEventListener('scroll', apply)
+      window.removeEventListener('resize', apply)
+      window.removeEventListener('orientationchange', apply)
+    }
+  }, [])
+
+  /**
+   * Deliberate freshness.
+   *
+   * This app owns scrolling — the document does not scroll — so Safari's native
+   * pull-to-refresh can never fire, and until now nothing re-read server state at all: a
+   * phone left on a table showed whatever it had when it loaded. That matters here because
+   * what it is showing can change underneath it: a zone can be taken out of service, a
+   * rehearsal can start or finish, a marker can be retired.
+   *
+   * Re-reads the SERVER, and deliberately through the read-only state function rather than
+   * the resolver: resolving records a scan, and coming back to a tab is not a scan. It
+   * performs no writes of any kind, so it cannot duplicate a request or a declaration, and
+   * a single in-flight guard stops overlapping calls.
+   */
+  const refreshState = useCallback(async () => {
+    if (refreshInFlight.current) return
+    if (!permanentCode) return   // legacy entry has no read-only equivalent; left untouched
+    refreshInFlight.current = true
+    setRefreshing(true)
+    try {
+      const { data, error } = await supabase.rpc('guest_service_point_state', { p_code: permanentCode })
+      const row = Array.isArray(data) ? data[0] : null
+      if (error || !row) return
+      if (!row.available) { setAppError('code_unavailable'); return }
+      setVenue({ id: '', name: row.venue_name ?? '' })
+      setAsset({ label: row.table_label ?? '', zone: row.zone_name ?? '' } as never)
+      setRehearsal(row.service_mode === 'rehearsal')
+    } finally {
+      refreshInFlight.current = false
+      setRefreshing(false)
+    }
+  }, [permanentCode])
+
+  /**
+   * Pull-to-refresh on the surface that scrolls.
+   *
+   * Not a re-implementation of Safari's gesture for its own sake — Safari's cannot run here,
+   * because the document does not scroll. This binds the same intent to .scr: a drag down
+   * that begins at the very top, past a deliberate threshold, runs the same read-only
+   * refresh. Below the threshold nothing happens, so an ordinary overscroll bounce does not
+   * fire a request.
+   */
+  useEffect(() => {
+    const el = document.querySelector('.sc.on .scr') as HTMLElement | null
+    if (!el) return
+    let startY = 0, pulling = false
+    const THRESHOLD = 64
+    const indicator = () => document.querySelector('.sc.on .ptr') as HTMLElement | null
+    const onStart = (e: TouchEvent) => {
+      pulling = el.scrollTop <= 0
+      startY = e.touches[0].clientY
+    }
+    const onMove = (e: TouchEvent) => {
+      if (!pulling) return
+      const dy = e.touches[0].clientY - startY
+      const ind = indicator()
+      if (ind) ind.classList.toggle('on', dy > 24)
+    }
+    const onEnd = (e: TouchEvent) => {
+      const ind = indicator()
+      if (!pulling) { ind?.classList.remove('on'); return }
+      const dy = (e.changedTouches[0]?.clientY ?? startY) - startY
+      pulling = false
+      if (dy > THRESHOLD) {
+        ind?.classList.add('on', 'spin')
+        void refreshState().finally(() => setTimeout(() => ind?.classList.remove('on', 'spin'), 350))
+      } else {
+        ind?.classList.remove('on')
+      }
+    }
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: true })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+    }
+  }, [screen, refreshState])
+
+  // Back in the foreground, or back on the network: both mean what is on screen may be stale.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') void refreshState() }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    window.addEventListener('online', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+      window.removeEventListener('online', onVisible)
+    }
+  }, [refreshState])
 
   // ── CLICK OUTSIDE SEARCH ──
   useEffect(() => {
@@ -1094,6 +1217,11 @@ function App() {
               <span className="sc-head-title">Allergies</span>
             </div>
             <div className="scr" style={{paddingTop:'14px'}}>
+              <div className={`ptr${refreshing ? ' on spin' : ''}`}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="2" strokeLinecap="round"><path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/></svg>
+                {refreshing ? 'Checking with the restaurant…' : 'Release to refresh'}
+              </div>
               {/* Shield + Title */}
               <div style={{textAlign:'center',marginBottom:'6px'}}>
                 <div style={{width:'56px',height:'56px',background:'rgba(245,158,11,.08)',border:'2px solid #f59e0b',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px'}}>

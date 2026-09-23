@@ -20,20 +20,35 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 .nav{background:#050b14;border-bottom:1px solid var(--b);display:flex;overflow-x:auto;flex-shrink:0;height:36px}
 .tab{padding:0 10px;height:36px;display:flex;align-items:center;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;flex-shrink:0;transition:.15s}
 .tab:hover{color:var(--t1)}.tab.on{color:var(--cyan);border-color:var(--cyan)}
-/* 100vh on mobile Safari is the LARGE viewport — the height with the toolbars hidden. With
-   them showing, this box extended below the visible area, and html/body are overflow:hidden,
-   so the page could not be scrolled down to reach it: the bottom of any form, including its
-   submit button, was simply unreachable. dvh tracks the viewport as the toolbars come and
-   go, which is the whole point of it. vh stays as the fallback for browsers without dvh —
-   it is not a fixed pixel height, and nothing here assumes a device size. */
-#app{height:calc(100vh - 36px);background:var(--bg);overflow:hidden;opacity:0;transition:opacity .5s .15s}
-@supports (height:100dvh){#app{height:calc(100dvh - 36px)}}
+/* SCROLL OWNERSHIP — exactly one scrolling surface on every screen: .scr.
+   The document does not scroll (html/body overflow:hidden), so every ancestor between the
+   viewport and .scr has to hand its height down intact. Three things were breaking that:
+
+   1. `- 36px` subtracted a top nav bar that this app does not render at all. It exists in
+      the stylesheet for the admin surfaces; Tableside has no such bar.
+   2. #app was a plain block, and .sc claimed height:100% of it. Once a sibling appeared
+      above .sc — the rehearsal banner — .sc still demanded the FULL height of #app, so it
+      overflowed by the banner's height and #app's overflow:hidden clipped that much off the
+      bottom. The clipped strip was the end of the scroll range, which is why a form could
+      scroll "most of the way" and never reach its last control. #app is a flex column now,
+      so the banner takes its space and .sc takes what is left.
+   3. Height came from viewport units alone. dvh is right where it is supported, but Safari
+      versions below 15.4 do not have it and fall back to vh — the toolbar-hidden height —
+      which puts the bottom of the box off-screen again. --app-h is measured from
+      visualViewport at runtime (see App.tsx) and wins when present. It is a measurement of
+      the actual visible area, not a device assumption. */
+:root{--app-h:100vh}
+@supports (height:100dvh){:root{--app-h:100dvh}}
+#root{height:var(--app-h);overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;min-height:0;background:var(--bg);overflow:hidden;opacity:0;transition:opacity .5s .15s}
 #app.vis{opacity:1}
-.sc{display:none;flex-direction:column;height:100%;min-height:0;overflow:hidden}.sc.on{display:flex}
+.sc{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden}.sc.on{display:flex}
 /* min-height:0 is what actually lets a flex child scroll: without it the item's automatic
    minimum is its content height, so it grows past its parent instead of scrolling inside it.
    The bottom inset keeps the last control clear of the home indicator. */
-.scr{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+/* The one scrolling surface. The bottom padding has to clear Safari's bottom chrome and the
+   home indicator so the LAST control can scroll fully clear of them, not just into view. */
+.scr{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding-bottom:calc(56px + env(safe-area-inset-bottom))}
 
 /* ══ CARD ══ */
 .card{background:var(--s1);border:1px solid var(--b);border-radius:20px;margin:12px;padding:22px 18px 0;position:relative;animation:cardIn .4s cubic-bezier(.34,1.2,.64,1)}
@@ -237,3 +252,18 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 .sc-head-title{font-size:14px;font-weight:700;color:var(--t1)}
 /* Says what pressing it does, immediately above it. */
 .sbtn-note{margin:10px 18px 0;font-size:12.5px;line-height:1.5;color:var(--t2);text-align:center}
+
+
+/* Banner and header are fixed-size siblings of the scrolling surface — they must never be
+   allowed to shrink it away or to push it past the bottom of the screen. */
+.rehearsal-bar{flex-shrink:0}
+.sc-head{flex-shrink:0}
+
+/* Pull to refresh. Native pull-to-refresh cannot fire here because the document does not
+   scroll — this app owns scrolling. Rather than leave the gesture dead, it is implemented
+   on the surface that does scroll. */
+.ptr{display:flex;align-items:center;justify-content:center;gap:8px;overflow:hidden;height:0;
+  color:var(--t2);font-size:12.5px;transition:height .18s ease}
+.ptr.on{height:34px}
+.ptr.spin svg{animation:ptrspin .8s linear infinite}
+@keyframes ptrspin{to{transform:rotate(360deg)}}
