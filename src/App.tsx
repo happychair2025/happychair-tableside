@@ -203,6 +203,17 @@ function App() {
   const [assetId, setAssetId] = useState<string | null>(tableParam)
   const [resolvedVenueId, setResolvedVenueId] = useState<string | null>(venueId)
 
+  /**
+   * Which identifier the guest arrived on.
+   *
+   * There is ONE guest experience. On the permanent-code path the browser holds no venue
+   * or asset id, so writes go through server functions that resolve the service point
+   * from the code; on the legacy path the ids are already known and the existing direct
+   * writes are used unchanged. Both land the same rows, fire the same triggers and feed
+   * the same downstream workflow.
+   */
+  const viaCode = !!permanentCode
+
   const go = (id: Screen) => {
     setScreen(id)
     setSubmitError('')
@@ -256,9 +267,12 @@ function App() {
           setLoading(false)
           return
         }
+        // Display metadata only. No venue id and no asset id ever reach this browser —
+        // every write goes back through the opaque code and the server resolves the
+        // service point itself.
         setVenue({ id: '', name: row.venue_name ?? '' })
         setAsset({ label: row.table_label ?? '', zone: row.zone_name ?? '' } as never)
-        setAppError('code_recognised')
+        setScreen('main')
         setLoading(false)
       })()
       return
@@ -330,41 +344,30 @@ function App() {
   // ══════════════════════════════════════════════════════════════
   // SUPABASE HANDLERS — PRESERVED EXACTLY
   // ══════════════════════════════════════════════════════════════
-  const handleRequestCheck = async () => {
-    if (!resolvedVenueId || !assetId) return
-    setSubmitError('')
+  const sendRequest = async (category: string): Promise<boolean> => {
+    if (viaCode) {
+      const { data, error } = await supabase.rpc('guest_create_request',
+        { p_code: permanentCode, p_category: category, p_custom_type: null })
+      if (error || !(data as { ok?: boolean } | null)?.ok) {
+        setSubmitError('Failed to send request. Please try again.'); return false
+      }
+      return true
+    }
+    if (!resolvedVenueId || !assetId) return false
     const { error } = await supabase.from('requests').insert({
-      venue_id: resolvedVenueId, asset_id: assetId, category: 'check_please', status: 'pending',
+      venue_id: resolvedVenueId, asset_id: assetId, category, status: 'pending',
     })
-    if (error) { setSubmitError('Failed to send request. Please try again.'); return }
+    if (error) { setSubmitError('Failed to send request. Please try again.'); return false }
+    return true
   }
 
-  const handleRequestWater = async () => {
-    if (!resolvedVenueId || !assetId) return
-    setSubmitError('')
-    const { error } = await supabase.from('requests').insert({
-      venue_id: resolvedVenueId, asset_id: assetId, category: 'water', status: 'pending',
-    })
-    if (error) { setSubmitError('Failed to send request. Please try again.'); return }
-  }
+  const handleRequestCheck = async () => { setSubmitError(''); await sendRequest('check_please') }
 
-  const handleRequestServer = async () => {
-    if (!resolvedVenueId || !assetId) return
-    setSubmitError('')
-    const { error } = await supabase.from('requests').insert({
-      venue_id: resolvedVenueId, asset_id: assetId, category: 'waiter', status: 'pending',
-    })
-    if (error) { setSubmitError('Failed to send request. Please try again.'); return }
-  }
+  const handleRequestWater = async () => { setSubmitError(''); await sendRequest('water') }
 
-  const handleRequestPlates = async () => {
-    if (!resolvedVenueId || !assetId) return
-    setSubmitError('')
-    const { error } = await supabase.from('requests').insert({
-      venue_id: resolvedVenueId, asset_id: assetId, category: 'clear', status: 'pending',
-    })
-    if (error) { setSubmitError('Failed to send request. Please try again.'); return }
-  }
+  const handleRequestServer = async () => { setSubmitError(''); await sendRequest('waiter') }
+
+  const handleRequestPlates = async () => { setSubmitError(''); await sendRequest('clear') }
 
   /**
    * ONE browser session at ONE table.
@@ -401,7 +404,7 @@ function App() {
   }
 
   const handleAllergenSubmit = async () => {
-    if (!resolvedVenueId || !assetId || decl.length === 0) {
+    if ((!viaCode && (!resolvedVenueId || !assetId)) || decl.length === 0) {
       // Previously a silent `return` that still navigated the guest to a success screen.
       setSubmitError(correcting
         ? "We couldn't confirm your updated allergy declaration was received. Please tell your server about the change directly."
@@ -409,7 +412,9 @@ function App() {
       return null
     }
     setSubmitError('')
-    const guestSessionId = guestSessionFor(assetId)
+    // Keyed by whatever identifies this table on this entry path. The permanent code is
+    // the table's identity, so it is the right session key when the browser has no asset id.
+    const guestSessionId = guestSessionFor(permanentCode ?? assetId ?? 'unknown')
     // Severity is the HIGHEST risk declared, not the first entered. Previously this
     // read decl[0]?.risk: a guest declaring lactose (discomfort) then peanut
     // (anaphylaxis) wrote 'discomfort'. The kitchen board gates its anaphylaxis
@@ -439,8 +444,27 @@ function App() {
     // (created_at >= now() - 36h) is satisfied by a row created moments ago.
     // supersedes_id: NULL for a first declaration; on a correction it names the revision
     // being replaced, so history is traversable in both directions.
-    const insertRevision = (supersedesId: string | null) =>
-      supabase.from('allergen_declarations').insert({
+    // Same table, same columns, same supersession semantics, same triggers on both paths.
+    // The safety workflow downstream cannot tell which identifier the guest arrived on.
+    const insertRevision = async (supersedesId: string | null) => {
+      if (viaCode) {
+        const { data, error } = await supabase.rpc('guest_submit_declaration', {
+          p_code: permanentCode,
+          p_allergens: fields.allergens,
+          p_severity: fields.severity,
+          p_cross_contact: fields.cross_contact,
+          p_notes: fields.notes || null,
+          p_guest_name: fields.guest_name,
+          p_guest_session_id: guestSessionId,
+          p_supersedes_id: supersedesId,
+        })
+        const r = data as { ok?: boolean; declaration_id?: string } | null
+        if (error || !r?.ok) {
+          return { data: null as { id: string } | null, error: error ?? { code: 'UNAVAILABLE', message: 'unavailable' } }
+        }
+        return { data: { id: r.declaration_id as string }, error: null }
+      }
+      return supabase.from('allergen_declarations').insert({
         venue_id: resolvedVenueId, asset_id: assetId,
         ...fields,
         notes: fields.notes || undefined,
@@ -448,10 +472,14 @@ function App() {
         status: 'pending',
         supersedes_id: supersedesId ?? undefined,
       }).select('id').single()
+    }
 
     const markSuperseded = async (id: string) => {
-      const { error: e } = await supabase.from('allergen_declarations')
-        .update({ superseded_at: new Date().toISOString() }).eq('id', id)
+      const { error: e } = viaCode
+        ? { error: (await supabase.rpc('guest_supersede_declaration',
+            { p_code: permanentCode, p_declaration_id: id })).error }
+        : await supabase.from('allergen_declarations')
+            .update({ superseded_at: new Date().toISOString() }).eq('id', id)
       // The correction itself is already durable; a failed marking is an audit-tidiness
       // problem, not a safety one, and must not be reported to the guest as a failure.
       // Consumers also derive supersession from the chain, so currency stays correct.
@@ -465,17 +493,21 @@ function App() {
     // context and gets its own independent workflow.
     let target = correcting
     if (!target) {
-      const { data: mine } = await supabase.from('allergen_declarations')
-        .select('id')
-        .eq('asset_id', assetId)
-        .eq('guest_session_id', guestSessionId)
-        .is('superseded_at', null)
-        .is('served_at', null)
-        .is('closed_at', null)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      if (mine?.id) target = mine.id as string
+      let mineId: string | null = null
+      if (viaCode) {
+        const { data } = await supabase.rpc('guest_open_declaration_for_session',
+          { p_code: permanentCode, p_guest_session_id: guestSessionId })
+        mineId = (data as { declaration_id?: string | null } | null)?.declaration_id ?? null
+      } else {
+        const { data: mine } = await supabase.from('allergen_declarations')
+          .select('id')
+          .eq('asset_id', assetId)
+          .eq('guest_session_id', guestSessionId)
+          .is('superseded_at', null).is('served_at', null).is('closed_at', null)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle()
+        mineId = (mine?.id as string | undefined) ?? null
+      }
+      if (mineId) target = mineId
     }
     let { data: row, error } = await insertRevision(target)
 
@@ -486,8 +518,17 @@ function App() {
     // the live table and is now rejected by a unique index on supersedes_id, so the retry
     // arrives here as 23505 and is resolved rather than duplicated.
     if (error && (error as {code?: string}).code === '23505' && target) {
-      const { data: existing } = await supabase.from('allergen_declarations')
-        .select('id,allergens,severity,cross_contact,notes').eq('supersedes_id', target).maybeSingle()
+      const { data: existing } = viaCode
+        ? await (async () => {
+            const r = await supabase.rpc('guest_find_correction_target',
+              { p_code: permanentCode, p_supersedes_id: target })
+            const v = r.data as { ok?: boolean; declaration_id?: string; allergens?: string[];
+              severity?: string; cross_contact?: boolean; notes?: string } | null
+            return { data: v?.ok ? { id: v.declaration_id as string, allergens: v.allergens,
+              severity: v.severity, cross_contact: v.cross_contact, notes: v.notes } : null }
+          })()
+        : await supabase.from('allergen_declarations')
+            .select('id,allergens,severity,cross_contact,notes').eq('supersedes_id', target).maybeSingle()
       if (existing) {
         if (sameDeclaration(existing, fields)) {
           // Identical retry: the earlier attempt IS this correction. Adopt it — idempotent,
@@ -526,7 +567,7 @@ function App() {
   }
 
   const submitSentiment = async (score: SentimentScore) => {
-    if (!resolvedVenueId || !assetId || submitting) return
+    if ((!viaCode && (!resolvedVenueId || !assetId)) || submitting) return
     setSubmitting(true)
     setSubmitError('')
     const payload = score === 3
@@ -535,11 +576,18 @@ function App() {
       ? { venue_id: resolvedVenueId, asset_id: assetId, score, google_review_prompted: false, manager_intervention_needed: false, notification_priority: 'normal' }
       : { venue_id: resolvedVenueId, asset_id: assetId, score, google_review_prompted: false, manager_intervention_needed: true, notification_priority: 'urgent' }
     // .select('id').single() so we can UPDATE this row later with optional notes.
-    const { data, error } = await supabase
-      .from('sentiment_ratings')
-      .insert(payload)
-      .select('id')
-      .single()
+    const { data, error } = viaCode
+      ? await (async () => {
+          const r = await supabase.rpc('guest_submit_sentiment', { p_code: permanentCode, p_score: score })
+          const v = r.data as { ok?: boolean; sentiment_id?: string } | null
+          return { data: v?.ok ? { id: v.sentiment_id as string } : null,
+                   error: r.error ?? (v?.ok ? null : { message: 'unavailable' }) }
+        })()
+      : await supabase
+          .from('sentiment_ratings')
+          .insert(payload)
+          .select('id')
+          .single()
     if (error || !data) {
       console.error('[tableside] sentiment submit failed:', error)
       setSubmitError("Couldn't send feedback — try again.")
@@ -560,10 +608,9 @@ function App() {
   // The hold mechanism in the urgent surface acts as the in-flight guard, so no
   // submitting flag is needed here.
   const handleUrgentSubmit = async (): Promise<boolean> => {
-    if (!resolvedVenueId || !assetId) return false
-    const { error } = await supabase.from('requests').insert({
-      venue_id: resolvedVenueId, asset_id: assetId, category: 'critical', status: 'pending',
-    })
+    if (!viaCode && (!resolvedVenueId || !assetId)) return false
+    const ok = await sendRequest('critical')
+    const error = ok ? null : new Error('request_failed')
     if (error) {
       console.error('[tableside] urgent submit failed:', error)
       setSubmitError("Couldn't reach staff — please wave for help.")
@@ -696,8 +743,15 @@ function App() {
     if (screen !== 'alwait' || !receipt || reviewedAt) return
     let cancelled = false
     const check = async () => {
-      const { data, error } = await supabase
-        .from('allergen_declarations').select('kitchen_ack_at').eq('id', receipt.id).maybeSingle()
+      const { data, error } = viaCode
+        ? await (async () => {
+            const r = await supabase.rpc('guest_declaration_state',
+              { p_code: permanentCode, p_declaration_id: receipt.id })
+            const v = r.data as { ok?: boolean; kitchen_ack_at?: string | null } | null
+            return { data: v?.ok ? { kitchen_ack_at: v.kitchen_ack_at ?? null } : null, error: r.error }
+          })()
+        : await supabase
+            .from('allergen_declarations').select('kitchen_ack_at').eq('id', receipt.id).maybeSingle()
       if (cancelled || error || !data) return
       if (data.kitchen_ack_at) setReviewedAt(data.kitchen_ack_at as string)
     }
