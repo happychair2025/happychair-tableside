@@ -31,10 +31,16 @@ type AllergyStep = 'rehearsal' | 'name' | 'allergens' | 'severity' | 'cross' | '
  * Identifies the exact disclosure text a guest accepted, stored on the declaration.
  *
  * A version, not a boolean: "they accepted" is worth little later, "they accepted THIS text"
- * can be answered. Bump this whenever a word of the disclosure below changes — an unchanged
+ * can be answered. Bumped whenever a word of the disclosure below changes — an unchanged
  * identifier over changed text is worse than no identifier at all.
+ *
+ * "provisional" is load-bearing. This wording is for the controlled rehearsal and has not
+ * been through counsel; it deliberately makes no statement about how information is handled,
+ * because no guest-facing Privacy Policy or Terms exists to make one against. When approved
+ * copy lands this string changes, and every declaration accepted under the provisional text
+ * stays identifiable as exactly that rather than being mistaken for the approved one.
  */
-const DISCLOSURE_VERSION = 'guest-allergy-share-2026-09-24'
+const DISCLOSURE_VERSION = 'guest-allergy-share-2026-09-24-provisional'
 
 /**
  * The four stored severity values are unchanged — only the words a guest reads.
@@ -213,8 +219,7 @@ function App() {
    * that is a separate decision the guest has not been asked for.
    */
   const [shareAck, setShareAck] = useState(false)
-  /** Reading the policy must not cost the guest what they have entered. */
-  const [legalDoc, setLegalDoc] = useState<'privacy'|'terms'|null>(null)
+
   /** Set when a step was opened from Review, so Continue returns there instead of onward. */
   const [fromReview, setFromReview] = useState(false)
   const [allergenSearch, setAllergenSearch] = useState('')
@@ -1525,22 +1530,8 @@ function App() {
                 </div>
               )}
 
-              {/* Policy reader. Rendered in place of the step, NOT as navigation — every
-                  answer the guest has given stays in state behind it, so reading the policy
-                  cannot cost them their declaration. */}
-              {legalDoc && (
-                <div className="stp">
-                  <h1 className="stp-q">{legalDoc === 'privacy' ? 'Privacy Policy' : 'Terms'}</h1>
-                  <p className="stp-s">
-                    This document is being finalised and is not published yet. For a copy, ask the
-                    restaurant or email support@happychair.today.
-                  </p>
-                  <button className="sbtn" onClick={() => setLegalDoc(null)}>Back to your review</button>
-                </div>
-              )}
-
               {/* ── 6 · REVIEW ── */}
-              {step === 'review' && !legalDoc && (
+              {step === 'review' && (
                 <div className="stp">
                   <h1 className="stp-q">Review what you&rsquo;re telling the restaurant</h1>
 
@@ -1596,12 +1587,6 @@ function App() {
                       Happy Chair does not determine whether food is safe for you and cannot
                       guarantee that a restaurant can prevent allergen exposure or cross-contact.
                       Always communicate directly with restaurant staff about your allergy.
-                    </p>
-                    <p className="dsc-p">
-                      Your information will be handled according to our{' '}
-                      <button className="dsc-link" onClick={() => setLegalDoc('privacy')}>Privacy Policy</button>
-                      {' '}and{' '}
-                      <button className="dsc-link" onClick={() => setLegalDoc('terms')}>Terms</button>.
                     </p>
                     <label className="dsc-ack">
                       <input type="checkbox" checked={shareAck} onChange={e => setShareAck(e.target.checked)}/>
