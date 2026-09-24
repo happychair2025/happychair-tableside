@@ -212,6 +212,8 @@ function App() {
   const [crossContact, setCrossContact] = useState<boolean|null>(null)
   /** The rehearsal explanation is shown in full once, then lives in the header. */
   const [rehearsalAck, setRehearsalAck] = useState(false)
+  /** Passport preview only. Nothing is collected, nothing is stored, nothing is claimed. */
+  const [passportOpen, setPassportOpen] = useState(false)
   /**
    * Affirmative acknowledgment that this visit's allergy information may be shared with THIS
    * restaurant. Starts unchecked every time and is never remembered: it is permission for one
@@ -585,8 +587,8 @@ function App() {
     if ((!viaCode && (!resolvedVenueId || !assetId)) || decl.length === 0) {
       // Previously a silent `return` that still navigated the guest to a success screen.
       setSubmitError(correcting
-        ? "We couldn't confirm your updated allergy declaration was received. Please tell your server about the change directly."
-        : "We couldn't confirm your allergy declaration was received. Please tell your server about the allergy directly.")
+        ? "We couldn't confirm your updated allergy information was received. Please tell a member of staff about the change directly."
+        : "We couldn't confirm your allergy information was received. Please tell a member of staff about your allergy directly.")
       return null
     }
     setSubmitError('')
@@ -730,8 +732,8 @@ function App() {
       // Nothing has been superseded at this point — the prior declaration is untouched and
       // remains current and truthful. No partial replacement of current state.
       setSubmitError(correcting
-        ? "We couldn't confirm your updated allergy declaration was received. Please tell your server about the change directly."
-        : "We couldn't confirm your allergy declaration was received. Please tell your server about the allergy directly.")
+        ? "We couldn't confirm your updated allergy information was received. Please tell a member of staff about the change directly."
+        : "We couldn't confirm your allergy information was received. Please tell a member of staff about your allergy directly.")
       return null
     }
     // Only the database accepting the row establishes receipt. Returned so the caller can
@@ -946,6 +948,17 @@ function App() {
   /** The single level the record actually carries — shown to the guest, not hidden. */
   const sentSeverity = maxSeverity(decl.map(d => d.risk))
   const sevLabel = (v: string) => SEV.find(x => x.v === v)?.l ?? ''
+
+  /**
+   * What to call this place, in the guest's copy.
+   *
+   * Happy Chair is used by cafés, bars, hotels and clubs as well as restaurants, and telling
+   * a guest in a hotel lounge that "the restaurant" will be told is simply wrong. Its actual
+   * name is the truest thing available and needs no taxonomy; "venue" is the fallback when
+   * the name has not resolved, chosen because it assumes nothing.
+   */
+  const venueName = venue?.name?.trim() || 'this venue'
+  const venueOrThe = venue?.name?.trim() || 'the venue'
 
   /**
    * Keep the focused control inside the part of the scroll container the guest can actually
@@ -1184,7 +1197,7 @@ function App() {
         {rehearsal && screen !== 'allergy' && (
           <div className="rehearsal-bar">
             <span className="rehearsal-tag">REHEARSAL</span>
-            <span>The restaurant is testing Happy Chair at this table. Anything you send reaches real staff.</span>
+            <span>{venue?.name?.trim() || 'This venue'} is testing Happy Chair at this table. Anything you send reaches real staff.</span>
           </div>
         )}
 
@@ -1385,14 +1398,14 @@ function App() {
               <div className={`ptr${refreshing ? ' on spin' : ''}`}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                   strokeWidth="2" strokeLinecap="round"><path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/></svg>
-                {refreshing ? 'Checking with the restaurant…' : 'Release to refresh'}
+                {refreshing ? 'Checking for updates…' : 'Release to refresh'}
               </div>
 
               {/* ── 0 · REHEARSAL, in full, once ── */}
               {step === 'rehearsal' && (
                 <div className="stp">
                   <div className="reh-mark">REHEARSAL</div>
-                  <h1 className="stp-q">The restaurant is testing Happy Chair at this table.</h1>
+                  <h1 className="stp-q">{venueName} is testing Happy Chair at this table.</h1>
                   <p className="stp-s">
                     Anything you send will reach real staff, but it will not be treated as a
                     guest visit.
@@ -1405,7 +1418,7 @@ function App() {
               {step === 'name' && (
                 <div className="stp">
                   <h1 className="stp-q">What&rsquo;s your first name?</h1>
-                  <p className="stp-s">So the restaurant knows who to look after.</p>
+                  <p className="stp-s">So {venueOrThe} knows who to look after.</p>
                   <input
                     className="fld" type="text" inputMode="text" autoComplete="given-name"
                     maxLength={40} placeholder="First name" value={guestFirstName}
@@ -1543,7 +1556,7 @@ function App() {
               {/* ── 4 · CROSS-CONTACT, its own question ── */}
               {step === 'cross' && (
                 <div className="stp">
-                  <h1 className="stp-q">Do you need the restaurant to avoid cross-contact?</h1>
+                  <h1 className="stp-q">Do you need {venueName} to avoid cross-contact?</h1>
                   <p className="stp-s">
                     This means keeping your food away from the allergen during preparation,
                     including shared surfaces, utensils or equipment.
@@ -1570,7 +1583,7 @@ function App() {
               {/* ── 5 · ANYTHING ELSE ── */}
               {step === 'note' && (
                 <div className="stp">
-                  <h1 className="stp-q">Anything else the restaurant should know?</h1>
+                  <h1 className="stp-q">Anything else {venueOrThe} should know?</h1>
                   <p className="stp-s">Optional.</p>
                   <textarea className="fld fld--area" value={allergenNotes}
                     onFocus={keepInView}
@@ -1585,7 +1598,7 @@ function App() {
               {/* ── 6 · REVIEW ── */}
               {step === 'review' && (
                 <div className="stp">
-                  <h1 className="stp-q">Review what you&rsquo;re telling the restaurant</h1>
+                  <h1 className="stp-q">Review what you&rsquo;re telling {venueName}</h1>
 
                   <div className="rv">
                     <div className="rv-h">Your name<button className="rv-e" onClick={() => editFromReview('name')}>Edit</button></div>
@@ -1616,14 +1629,14 @@ function App() {
                   {/* The record holds ONE level for the whole thing. Said out loud rather
                       than left for the guest to discover, or not discover. */}
                   <div className="rv rv--sent">
-                    <div className="rv-h">What the restaurant is told</div>
+                    <div className="rv-h">What {venueOrThe} is told</div>
                     <div className="rv-sent">{sevLabel(sentSeverity || '') || '—'}</div>
                     <div className="rv-note">
                       Happy Chair sends one level for your table — the most serious one you chose.
                     </div>
                   </div>
 
-                  {correcting && <div className="stp-note">Updating this will mean the restaurant looks at it again.</div>}
+                  {correcting && <div className="stp-note">Updating this will mean {venueOrThe} looks at it again.</div>}
                   {submitError && <div className="stp-err">{submitError}</div>}
 
                   {/* Short, read where the decision is made. Not a scrolling agreement:
@@ -1632,24 +1645,24 @@ function App() {
                   <div className="dsc">
                     <div className="dsc-h">Before you send</div>
                     <p className="dsc-p">
-                      Happy Chair will share the allergy information you provided with this
-                      restaurant to help its staff respond to your request.
+                      Happy Chair will share the allergy information you provided with {venueName}{' '}
+                      to help its staff respond to your request.
                     </p>
                     <p className="dsc-p">
                       Happy Chair does not determine whether food is safe for you and cannot
-                      guarantee that a restaurant can prevent allergen exposure or cross-contact.
-                      Always communicate directly with restaurant staff about your allergy.
+                      guarantee that a venue can prevent allergen exposure or cross-contact.
+                      Always communicate directly with staff about your allergy.
                     </p>
                     <label className="dsc-ack">
                       <input type="checkbox" checked={shareAck} onChange={e => setShareAck(e.target.checked)}/>
                       <span className="dsc-box" aria-hidden="true">{shareAck ? '✓' : ''}</span>
-                      <span className="dsc-ack-t">I understand and want to share this information with the restaurant.</span>
+                      <span className="dsc-ack-t">I understand and want to share this information with {venueName}.</span>
                     </label>
                   </div>
 
-                  <div className="sbtn-note">Happy Chair will send this to the restaurant.</div>
+                  <div className="sbtn-note">Happy Chair will send this to {venueName}.</div>
                   <button className="sbtn" onClick={trySubmit} disabled={submitting || !shareAck}>
-                    <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : 'Tell the Restaurant'}
+                    <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : `Tell ${venueName}`}
                   </button>
                   {!shareAck && <p className="stp-hint">Please tick the box above to send.</p>}
                 </div>
@@ -1676,12 +1689,12 @@ function App() {
                   only by a database-persisted kitchen_ack_at. State 2 says REVIEW and nothing
                   more — no employee name (attribution is a device string until Track B), no
                   server notification, no preparation, no verification, no safety claim. */}
-              <div className="ot" style={{color:'#f59e0b'}}>{reviewedAt ? 'Reviewed by Venue' : wasCorrected ? 'Update Received' : 'Declaration Received'}</div>
+              <div className="ot" style={{color:'#f59e0b'}}>{reviewedAt ? `Reviewed by ${venueName}` : wasCorrected ? 'Update Sent' : 'Allergy Information Sent'}</div>
               <div className="os">{reviewedAt
-                ? `${venue?.name ?? 'The venue'} has reviewed your allergy declaration.`
+                ? `${venueOrThe} has reviewed your allergy information.`
                 : wasCorrected
-                  ? `Your updated allergy declaration was received by Happy Chair for ${venue?.name ?? 'this venue'}.`
-                  : `Your allergy declaration was received by Happy Chair for ${venue?.name ?? 'this venue'}.`}</div>
+                  ? `Happy Chair received your updated allergy information for ${venueName}.`
+                  : `Happy Chair received your allergy information for ${venueName}.`}</div>
               {/* Faithful echo of what the database accepted — the guest's own allergen
                   names and their own severity wording from the picker (SEV[].l). No new
                   safety vocabulary is introduced here. */}
@@ -1703,7 +1716,68 @@ function App() {
                 onClick={() => { if (receipt) { setCorrecting(receipt.id); openAllergyFlow(true); go('allergy') } }}
                 style={{marginTop:'20px',fontSize:'14px',color:'var(--t2)',cursor:'pointer',textDecoration:'underline',textUnderlineOffset:'3px'}}
               >
-                Something wrong? Update your declaration
+                Need to make a change? Update your allergy information
+              </div>
+
+              {/* PASSPORT — entry point only.
+                  Deliberately below the receipt and visually secondary: what just happened is
+                  the guest telling this venue, and that must not be crowded by a pitch. It
+                  stores nothing, collects nothing and claims nothing has been saved, because
+                  nothing has. Passport data must never become a declaration on its own — a
+                  guest tells a venue, explicitly, every visit. */}
+              <div className="psp">
+                <div className="psp-t">Happy Chair Passport</div>
+                <div className="psp-l">Take your allergies with you.</div>
+                <div className="psp-b">
+                  Save your allergy profile once, then review and share it when you visit any
+                  participating Happy Chair venue.
+                </div>
+                <button className="psp-cta" onClick={() => setPassportOpen(true)}>
+                  Set Up My Passport <span aria-hidden="true">→</span>
+                </button>
+                <div className="psp-r">You&rsquo;re always in control of what you share.</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PASSPORT OVERVIEW — a preview of something not yet built.
+            It takes no input and writes nothing. The one thing it must not do is imply a
+            profile now exists, so it says plainly that setup is not available yet. */}
+        {passportOpen && (
+          <div className="sc on" style={{position:'fixed',inset:0,zIndex:80,background:'var(--bg)'}}>
+            <div className="sc-head">
+              <button className="sc-back" onClick={() => setPassportOpen(false)} aria-label="Back">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+                Back
+              </button>
+              <span className="sc-head-title">Passport</span>
+            </div>
+            <div className="scr">
+              <div className="stp">
+                <h1 className="stp-q">Happy Chair Passport</h1>
+                <p className="stp-s">Take your allergies with you.</p>
+
+                <div className="psp-step">
+                  <span className="psp-n">1</span>
+                  <span>Save your allergy profile once — your allergies, how serious each one is, and anything you want staff to know.</span>
+                </div>
+                <div className="psp-step">
+                  <span className="psp-n">2</span>
+                  <span>Arrive at any participating Happy Chair venue and your profile is ready for you to check.</span>
+                </div>
+                <div className="psp-step">
+                  <span className="psp-n">3</span>
+                  <span>Review and change anything for that visit, then choose to tell that venue. Nothing is ever sent for you.</span>
+                </div>
+
+                <div className="psp-note">
+                  <strong>Not available yet.</strong> Passport is in development and cannot be set
+                  up during this test. Nothing has been saved, and no allergy profile exists yet.
+                </div>
+                <div className="psp-r">You&rsquo;re always in control of what you share.</div>
+
+                <button className="sbtn" onClick={() => setPassportOpen(false)}>Back to your confirmation</button>
               </div>
             </div>
           </div>

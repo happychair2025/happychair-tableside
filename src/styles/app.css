@@ -375,7 +375,10 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 
 /* Disclosure before sending. Short by design — a long agreement immediately before a safety
    action is read by nobody, and consent nobody read is not consent. */
-.dsc{background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:16px;margin:4px 0 16px}
+/* The order has to stay obvious — information, then acknowledgment, then the action — but
+   the acknowledgment was sitting almost against the button, which reads as one control and
+   invites tapping past it. Separated, still clearly a sequence. */
+.dsc{background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:16px;margin:4px 0 26px}
 /* Sentence case, deliberately. Every other section label on this screen is an uppercase
    eyebrow, but this is disclosure copy addressed to the guest — uppercasing it changes
    what they actually read, and the wording here was specified exactly. */
@@ -390,3 +393,27 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 .dsc-ack input:checked + .dsc-box{background:var(--role-action);border-color:var(--role-action)}
 .dsc-ack input:focus-visible + .dsc-box{outline:2px solid var(--role-action);outline-offset:2px}
 .dsc-ack-t{font-size:14.5px;line-height:1.45;color:var(--t1);font-weight:600}
+
+/* ── PASSPORT · entry point and preview ───────────────────────────────────────
+   Secondary to the receipt by construction. What just happened — the guest telling this
+   venue — is the subject of that screen; this sits below it, quieter, and promises nothing. */
+.psp{margin:26px 18px 0;padding:18px;background:var(--s1);border:1px solid var(--b);border-radius:14px;text-align:left}
+/* A product name, set as a product name. Uppercasing it turned "Happy Chair Passport"
+   into HAPPY CHAIR PASSPORT — an eyebrow label rather than the thing being introduced. */
+.psp-t{font-size:13px;font-weight:800;letter-spacing:.01em;color:var(--cyan);margin-bottom:8px}
+.psp-l{font-size:18px;font-weight:700;color:var(--t1);line-height:1.3;margin-bottom:8px}
+.psp-b{font-size:14px;line-height:1.55;color:var(--t2);margin-bottom:16px}
+.psp-cta{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:50px;
+  background:transparent;border:1.5px solid var(--cyan);border-radius:12px;color:var(--cyan);
+  font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
+.psp-cta:focus{outline:none}
+.psp-cta:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.psp-r{margin-top:12px;font-size:13px;line-height:1.5;color:var(--t2);text-align:center}
+.psp-step{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px;font-size:14.5px;line-height:1.55;color:var(--t2)}
+.psp-n{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--s2);border:1px solid var(--b);
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--t1)}
+/* Says plainly that nothing has been saved. This is the sentence that stops a preview
+   becoming a promise. */
+.psp-note{margin:18px 0 6px;padding:14px;border-radius:12px;background:var(--s2);border:1px solid var(--b);
+  font-size:14px;line-height:1.55;color:var(--t2)}
+.psp-note strong{color:var(--t1)}
