@@ -365,3 +365,23 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 .sev-txt--caution{color:var(--role-caution)}
 .sev-txt--critical{color:var(--role-critical)}
 .sev-txt--plain{color:var(--t1)}
+
+/* Disclosure before sending. Short by design — a long agreement immediately before a safety
+   action is read by nobody, and consent nobody read is not consent. */
+.dsc{background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:16px;margin:4px 0 16px}
+/* Sentence case, deliberately. Every other section label on this screen is an uppercase
+   eyebrow, but this is disclosure copy addressed to the guest — uppercasing it changes
+   what they actually read, and the wording here was specified exactly. */
+.dsc-h{font-size:15px;font-weight:700;color:var(--t1);margin-bottom:10px}
+.dsc-p{font-size:13.5px;line-height:1.55;color:var(--t2);margin:0 0 10px}
+.dsc-link{background:none;border:none;padding:0;font-family:inherit;font-size:13.5px;font-weight:600;
+  color:var(--role-action);text-decoration:underline;cursor:pointer}
+/* The acknowledgment itself: a real checkbox for assistive tech, a large drawn box for a
+   thumb, and the whole row is the target. */
+.dsc-ack{display:flex;align-items:flex-start;gap:12px;min-height:48px;margin-top:6px;cursor:pointer}
+.dsc-ack input{position:absolute;opacity:0;width:1px;height:1px}
+.dsc-box{flex-shrink:0;width:26px;height:26px;border-radius:7px;border:1.5px solid var(--b2);
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--bg);margin-top:1px}
+.dsc-ack input:checked + .dsc-box{background:var(--role-action);border-color:var(--role-action)}
+.dsc-ack input:focus-visible + .dsc-box{outline:2px solid var(--role-action);outline-offset:2px}
+.dsc-ack-t{font-size:14.5px;line-height:1.45;color:var(--t1);font-weight:600}

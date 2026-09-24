@@ -28,6 +28,15 @@ const PRESETS = ['Milk','Eggs','Fish','Shellfish','Tree Nuts','Peanuts','Wheat',
 type AllergyStep = 'rehearsal' | 'name' | 'allergens' | 'severity' | 'cross' | 'note' | 'review'
 
 /**
+ * Identifies the exact disclosure text a guest accepted, stored on the declaration.
+ *
+ * A version, not a boolean: "they accepted" is worth little later, "they accepted THIS text"
+ * can be answered. Bump this whenever a word of the disclosure below changes — an unchanged
+ * identifier over changed text is worse than no identifier at all.
+ */
+const DISCLOSURE_VERSION = 'guest-allergy-share-2026-09-24'
+
+/**
  * The four stored severity values are unchanged — only the words a guest reads.
  *
  * `tone` is a ROLE, not a colour: 'plain' carries no hue at all, because the two lower
@@ -197,6 +206,15 @@ function App() {
   const [crossContact, setCrossContact] = useState<boolean|null>(null)
   /** The rehearsal explanation is shown in full once, then lives in the header. */
   const [rehearsalAck, setRehearsalAck] = useState(false)
+  /**
+   * Affirmative acknowledgment that this visit's allergy information may be shared with THIS
+   * restaurant. Starts unchecked every time and is never remembered: it is permission for one
+   * submission, not a setting. It is explicitly NOT consent to save an Allergy Passport —
+   * that is a separate decision the guest has not been asked for.
+   */
+  const [shareAck, setShareAck] = useState(false)
+  /** Reading the policy must not cost the guest what they have entered. */
+  const [legalDoc, setLegalDoc] = useState<'privacy'|'terms'|null>(null)
   /** Set when a step was opened from Review, so Continue returns there instead of onward. */
   const [fromReview, setFromReview] = useState(false)
   const [allergenSearch, setAllergenSearch] = useState('')
@@ -423,7 +441,7 @@ function App() {
         // service point itself.
         setVenue({ id: '', name: row.venue_name ?? '' })
         setAsset({ label: row.table_label ?? '', zone: row.zone_name ?? '' } as never)
-        // The restaurant is practising with this table before opening it to guests. Whoever
+        // The restaurant is testing Happy Chair at this table before opening it. Whoever
         // is holding the phone is a member of staff, and everything they send is real — it
         // is simply not a guest. Saying so is the only thing that keeps the two apart.
         setRehearsal(row.service_mode === 'rehearsal')
@@ -612,6 +630,8 @@ function App() {
           p_guest_name: fields.guest_name,
           p_guest_session_id: guestSessionId,
           p_supersedes_id: supersedesId,
+          // Not a boolean. Which text they agreed to is the part worth keeping.
+          p_disclosure_version: DISCLOSURE_VERSION,
         })
         const r = data as { ok?: boolean; declaration_id?: string } | null
         if (error || !r?.ok) {
@@ -981,6 +1001,8 @@ function App() {
       return
     }
     if (crossContact === null) { setFromReview(true); setStep('cross'); return }
+    // Never submit without the acknowledgment, regardless of how submit was reached.
+    if (!shareAck) { setStep('review'); return }
     if (submitting) return
     // The receipt screen is reachable ONLY through a successful INSERT. Previously this
     // called handleAllergenSubmit() without awaiting it and then navigated
@@ -1108,7 +1130,7 @@ function App() {
         {rehearsal && (
           <div className="rehearsal-bar">
             <span className="rehearsal-tag">REHEARSAL</span>
-            <span>This table is being tested by the restaurant. Requests go to real staff.</span>
+            <span>The restaurant is testing Happy Chair at this table. Anything you send reaches real staff.</span>
           </div>
         )}
 
@@ -1316,10 +1338,10 @@ function App() {
               {step === 'rehearsal' && (
                 <div className="stp">
                   <div className="reh-mark">REHEARSAL</div>
-                  <h1 className="stp-q">The restaurant is practising at this table.</h1>
+                  <h1 className="stp-q">The restaurant is testing Happy Chair at this table.</h1>
                   <p className="stp-s">
-                    Everything you send is real and reaches real staff. There is simply no
-                    guest order behind it.
+                    Anything you send will reach real staff, but it will not be treated as a
+                    guest visit.
                   </p>
                   <button className="sbtn" onClick={() => advance('rehearsal')}>Got it</button>
                 </div>
@@ -1503,8 +1525,22 @@ function App() {
                 </div>
               )}
 
+              {/* Policy reader. Rendered in place of the step, NOT as navigation — every
+                  answer the guest has given stays in state behind it, so reading the policy
+                  cannot cost them their declaration. */}
+              {legalDoc && (
+                <div className="stp">
+                  <h1 className="stp-q">{legalDoc === 'privacy' ? 'Privacy Policy' : 'Terms'}</h1>
+                  <p className="stp-s">
+                    This document is being finalised and is not published yet. For a copy, ask the
+                    restaurant or email support@happychair.today.
+                  </p>
+                  <button className="sbtn" onClick={() => setLegalDoc(null)}>Back to your review</button>
+                </div>
+              )}
+
               {/* ── 6 · REVIEW ── */}
-              {step === 'review' && (
+              {step === 'review' && !legalDoc && (
                 <div className="stp">
                   <h1 className="stp-q">Review what you&rsquo;re telling the restaurant</h1>
 
@@ -1547,10 +1583,38 @@ function App() {
                   {correcting && <div className="stp-note">Updating this will mean the restaurant looks at it again.</div>}
                   {submitError && <div className="stp-err">{submitError}</div>}
 
+                  {/* Short, read where the decision is made. Not a scrolling agreement:
+                      a wall of text immediately before a safety action is read by nobody,
+                      and consent nobody read is not consent. */}
+                  <div className="dsc">
+                    <div className="dsc-h">Before you send</div>
+                    <p className="dsc-p">
+                      Happy Chair will share the allergy information you provided with this
+                      restaurant to help its staff respond to your request.
+                    </p>
+                    <p className="dsc-p">
+                      Happy Chair does not determine whether food is safe for you and cannot
+                      guarantee that a restaurant can prevent allergen exposure or cross-contact.
+                      Always communicate directly with restaurant staff about your allergy.
+                    </p>
+                    <p className="dsc-p">
+                      Your information will be handled according to our{' '}
+                      <button className="dsc-link" onClick={() => setLegalDoc('privacy')}>Privacy Policy</button>
+                      {' '}and{' '}
+                      <button className="dsc-link" onClick={() => setLegalDoc('terms')}>Terms</button>.
+                    </p>
+                    <label className="dsc-ack">
+                      <input type="checkbox" checked={shareAck} onChange={e => setShareAck(e.target.checked)}/>
+                      <span className="dsc-box" aria-hidden="true">{shareAck ? '✓' : ''}</span>
+                      <span className="dsc-ack-t">I understand and want to share this information with the restaurant.</span>
+                    </label>
+                  </div>
+
                   <div className="sbtn-note">Happy Chair will send this to the restaurant.</div>
-                  <button className="sbtn" onClick={trySubmit} disabled={submitting}>
+                  <button className="sbtn" onClick={trySubmit} disabled={submitting || !shareAck}>
                     <ShieldIcon size={18} color="var(--bg)"/> {submitting ? 'Sending…' : 'Tell the Restaurant'}
                   </button>
+                  {!shareAck && <p className="stp-hint">Please tick the box above to send.</p>}
                 </div>
               )}
             </div>
