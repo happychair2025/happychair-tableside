@@ -947,12 +947,58 @@ function App() {
   const sentSeverity = maxSeverity(decl.map(d => d.risk))
   const sevLabel = (v: string) => SEV.find(x => x.v === v)?.l ?? ''
 
-  // Keyboard-aware: bring the focused field AND its action into the visible viewport
-  // together, so the thing to press next is never behind the keyboard.
+  /**
+   * Keep the focused control inside the part of the scroll container the guest can actually
+   * see.
+   *
+   * The previous version scrolled the whole STEP into view with block:'end'. With the
+   * keyboard open the step is taller than the port, so aligning its bottom pushed its top —
+   * the label and the input — above the top of the scroll container, where it is clipped
+   * and reads as sitting under the header.
+   *
+   * The usable region is the scroll container's own box, which already begins below the
+   * persistent header, intersected with what the keyboard leaves visible. Both are measured:
+   * the container from its rect, the keyboard from visualViewport, which is also what sizes
+   * the app. Nothing here assumes a device, a header height or a keyboard height.
+   */
+  const focusedField = useRef<HTMLElement | null>(null)
+  const ensureVisible = useCallback((el: HTMLElement | null) => {
+    if (!el) return
+    const scr = el.closest('.scr') as HTMLElement | null
+    if (!scr) return
+    const GAP = 14
+    const port = scr.getBoundingClientRect()
+    const vv = window.visualViewport
+    // The keyboard is not part of the visible area even when the container still extends
+    // behind it.
+    const visibleBottom = Math.min(port.bottom, (vv ? vv.offsetTop + vv.height : window.innerHeight))
+    const top = port.top + GAP
+    const bottom = visibleBottom - GAP
+    const r = el.getBoundingClientRect()
+    if (r.top < top) scr.scrollTop -= (top - r.top)
+    else if (r.bottom > bottom) scr.scrollTop += (r.bottom - bottom)
+  }, [])
+
   const keepInView = (e: React.FocusEvent<HTMLElement>) => {
     const el = e.currentTarget
-    setTimeout(() => el.closest('.stp')?.scrollIntoView({ block: 'end', behavior: 'smooth' }), 250)
+    focusedField.current = el
+    // Once now, then again as the keyboard actually arrives — iOS reports the new viewport
+    // over several frames, and a single pass lands on the pre-keyboard geometry.
+    ensureVisible(el)
+    requestAnimationFrame(() => ensureVisible(el))
+    setTimeout(() => ensureVisible(el), 200)
+    setTimeout(() => ensureVisible(el), 450)
   }
+
+  // The viewport changes when the keyboard opens, closes or the toolbars move. While a field
+  // is focused, that is a reason to re-check where it sits.
+  useEffect(() => {
+    const vv = window.visualViewport
+    const onChange = () => { if (focusedField.current) ensureVisible(focusedField.current) }
+    vv?.addEventListener('resize', onChange)
+    vv?.addEventListener('scroll', onChange)
+    return () => { vv?.removeEventListener('resize', onChange); vv?.removeEventListener('scroll', onChange) }
+  }, [ensureVisible])
 
   const searchResults = allergenSearch.length > 0
     ? ALLERGEN_DB.filter(a => a.n.toLowerCase().includes(allergenSearch.toLowerCase()) && !decl.some(d => d.name === a.n)).slice(0, 6)
@@ -1132,7 +1178,10 @@ function App() {
 
         {/* The restaurant is rehearsing at this table. Shown on every screen, not just the
             first, because whoever picks the phone up mid-flow has to know too. */}
-        {rehearsal && (
+        {/* AllergyShield carries its own rehearsal treatment: the full explanation once at
+            entry, then the compact pill in its header. Rendering this banner as well put both
+            on screen at the same time and ate the vertical space the flow needs. */}
+        {rehearsal && screen !== 'allergy' && (
           <div className="rehearsal-bar">
             <span className="rehearsal-tag">REHEARSAL</span>
             <span>The restaurant is testing Happy Chair at this table. Anything you send reaches real staff.</span>
@@ -1361,6 +1410,7 @@ function App() {
                     className="fld" type="text" inputMode="text" autoComplete="given-name"
                     maxLength={40} placeholder="First name" value={guestFirstName}
                     onFocus={keepInView}
+                    onBlur={() => { focusedField.current = null }}
                     onChange={e => setGuestFirstName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur() }}
                   />
@@ -1391,6 +1441,7 @@ function App() {
                     <input className="srb" type="text" placeholder="Search — butter, fish stock, gluten…" maxLength={60} autoComplete="off"
                       value={allergenSearch}
                       onFocus={keepInView}
+                      onBlur={() => { focusedField.current = null }}
                       onChange={e => { setAllergenSearch(e.target.value); setShowSearchResults(true) }}
                       onKeyDown={e => {
                         if (e.key === 'Enter' && allergenSearch.trim()) {
@@ -1523,6 +1574,7 @@ function App() {
                   <p className="stp-s">Optional.</p>
                   <textarea className="fld fld--area" value={allergenNotes}
                     onFocus={keepInView}
+                    onBlur={() => { focusedField.current = null }}
                     placeholder="Example: I react to shared fryer oil."
                     onChange={e => setAllergenNotes(e.target.value)}/>
                   <button className="sbtn" onClick={() => advance('note')}>Continue</button>
