@@ -1,0 +1,87 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="stylesheet" href="/app.css"></head>
+<body><div id="root"></div><pre id="err" style="color:#f88;font:10px monospace"></pre>
+<script>window.onerror=m=>{document.getElementById("err").textContent+="ERROR: "+m+"\n"}</script>
+<script src="/bundle.js"></script>
+<script>
+const w=ms=>new Promise(r=>setTimeout(r,ms)); const f=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+const T=[];let pass=0,fail=0;
+const ok=(n,c,x)=>{c?pass++:fail++;T.push((c?'PASS  ':'FAIL  ')+n+(x&&!c?'  ['+x+']':''))};
+const q=s=>document.querySelector(s); const all=s=>[...document.querySelectorAll(s)];
+const txt=()=>document.body.innerText;
+const btn=re=>all('button').filter(b=>re.test((b.textContent||'').trim())).sort((a,b)=>a.textContent.length-b.textContent.length)[0];
+const tap=async e=>{e.click();await f();await w(170)};
+const setVal=async(e,v)=>{const p=e.tagName==='TEXTAREA'?HTMLTextAreaElement:HTMLInputElement;
+  Object.getOwnPropertyDescriptor(p.prototype,'value').set.call(e,v);e.dispatchEvent(new Event('input',{bubbles:true}));await f();await w(120)};
+const stepQ=()=>q('.stp-q')?.textContent.trim()||'';
+const chip=n=>all('.chip').find(c=>c.textContent.trim().replace(/^✓/,'').trim()===n);
+// Emergency present, labelled, big enough, and not colour-only
+const emg=(where)=>{const e=q('.sc.on .emg');
+  if(!e){ok('EMG · available at '+where,false,'missing');return;}
+  const r=e.getBoundingClientRect();
+  const label=e.getAttribute('aria-label');
+  ok('EMG · available at '+where, true);
+  ok('EMG · labelled Medical Emergency at '+where, label==='Medical Emergency', String(label));
+  ok('EMG · touch target >=44px at '+where, r.height>=44, Math.round(r.height)+'px');
+  ok('EMG · word present, not colour-only at '+where, /Emergency/.test(e.textContent||''));
+};
+(async()=>{
+ try{
+  await w(600); await tap(btn(/Food Allergy/i));
+  emg('rehearsal notice'); await tap(btn(/^Got it$/));
+  emg('first name');
+  // keyboard-open proxy: field focused, header must still carry it
+  q('.fld').focus(); await f(); await w(200);
+  ok('EMG · still present with a field focused', !!q('.sc.on .emg'));
+  await setVal(q('.fld'),'Tom'); await tap(btn(/^Continue/)); await w(250);
+  emg('allergens');
+  await tap(chip('Peanuts')); await tap(btn(/^Continue/));
+  emg('severity');
+  await tap(all('.opt')[3]); await tap(btn(/^Continue$/));
+  emg('cross-contact');
+  await tap(all('.opt')[0]); await tap(btn(/^Continue$/));
+  emg('optional note');
+  q('.fld--area').focus(); await f(); await w(200);
+  ok('EMG · still present with the note field focused', !!q('.sc.on .emg'));
+  await tap(btn(/^Skip$/));
+  emg('review');
+
+  // Does NOT alert by itself — opening it makes no call, and the hold is the real trigger
+  const before=(window.__CALLS__||[]).length;
+  await tap(q('.sc.on .emg'));
+  ok('EMG · opens the existing emergency screen', /Need Help Right Now\?/i.test(txt()));
+  ok('EMG · requires press-and-hold, no accidental alert', /Press and Hold for Immediate Help/i.test(txt()));
+  ok('EMG · opening it alerts nobody', (window.__CALLS__||[]).length===before,
+     'calls='+((window.__CALLS__||[]).length-before));
+  // returns to where the guest was, with everything intact
+  await tap(q('.sc.on .close-x'));
+  ok('EMG · returns to the same step', /review what you.?re telling/i.test(stepQ()), stepQ());
+  ok('EMG · answers preserved', /Tom/.test(txt()) && /Anaphylaxis/.test(txt()));
+  ok('EMG · acknowledgment not auto-granted', !q('.dsc-ack input').checked);
+
+  // rehearsal must not remove it
+  ok('EMG · present during rehearsal', !!q('.reh-pill') && !!q('.sc.on .emg'));
+
+  await tap(q('.dsc-ack input'));
+  await tap(btn(/^Tell Happy Bistro$/)); await w(800);
+  emg('receipt / trust loop');
+  await tap(btn(/Set Up My Passport/));
+  emg('passport preview');
+  await tap(btn(/Back to your confirmation/));
+
+  // Anaphylaxis is not an emergency declaration
+  ok('SEM · Anaphylaxis choice did not trigger emergency',
+     !/Need Help Right Now\?/i.test(txt()) && /Allergy Information Sent/i.test(txt()));
+
+  // regression
+  const subs=(window.__CALLS__||[]).filter(c=>c.fn==='guest_submit_declaration');
+  ok('R · exactly one declaration', subs.length===1, 'n='+subs.length);
+  ok('R · disclosure version unchanged', subs[0]?.args?.p_disclosure_version==='guest-allergy-share-2026-09-24-provisional');
+  ok('R · venue naming intact', /Happy Chair received your allergy information for Happy Bistro/i.test(txt()));
+ }catch(e){T.push('THREW: '+e.message);fail++}
+ T.push(''); T.push(fail===0?('ALL '+pass+' CHECKS PASS'):(pass+' pass, '+fail+' FAIL'));
+ const o=document.createElement('pre');o.id='res';o.textContent=T.join('\n');document.body.appendChild(o);
+ try{await fetch('/__results',{method:'POST',body:T.join('\n')})}catch(e){}
+})();
+</script></body></html>

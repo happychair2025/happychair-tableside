@@ -249,7 +249,7 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 .sc-back{display:flex;align-items:center;gap:7px;min-height:44px;padding:0 12px;background:none;border:none;color:var(--t2);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;border-radius:10px}
 .sc-back:hover{color:var(--t1);background:rgba(255,255,255,.04)}
 .sc-back svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
-.sc-head-title{font-size:14px;font-weight:700;color:var(--t1)}
+.sc-head-title{font-size:14px;font-weight:700;color:var(--t1);margin-right:auto}
 /* Says what pressing it does, immediately above it. */
 .sbtn-note{margin:10px 18px 0;font-size:12.5px;line-height:1.5;color:var(--t2);text-align:center}
 
@@ -417,3 +417,22 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 .psp-note{margin:18px 0 6px;padding:14px;border-radius:12px;background:var(--s2);border:1px solid var(--b);
   font-size:14px;line-height:1.55;color:var(--t2)}
 .psp-note strong{color:var(--t1)}
+
+/* ── MEDICAL EMERGENCY · reachable from every AllergyShield state ─────────────
+   Compact by design. It sits in the header that already exists so it costs no vertical
+   space and never competes with the decision on screen. Pressing it opens the existing
+   emergency screen; the press-and-hold there is what actually alerts anyone, so a mis-tap
+   while navigating cannot raise a false alarm.
+
+   Meaning does not rest on the colour: the word "Emergency" is always present, and the
+   accessible name is "Medical Emergency". The red is reinforcement. */
+.emg{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;
+  background:rgba(239,68,68,.10);border:1.5px solid rgba(239,68,68,.55);border-radius:10px;
+  color:#fca5a5;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.emg:active{background:rgba(239,68,68,.18)}
+.emg:focus{outline:none}
+.emg:focus-visible{outline:2px solid var(--danger);outline-offset:2px}
+.emg-i{display:flex;width:16px;height:16px}
+.emg-i svg{width:16px;height:16px}
+/* A header on screens that previously had none, carrying only the title and the control. */
+.sc-head--bare{border-bottom:none;padding-top:12px}

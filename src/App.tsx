@@ -105,6 +105,32 @@ const Face = ({type,size}:{type:'ok'|'warn'|'danger',size:number}) => {
   );
 };
 
+/**
+ * MEDICAL EMERGENCY — reachable from every AllergyShield state.
+ *
+ * A guest having a reaction must never have to navigate backwards out of a form to find
+ * help. Deliberately compact: it lives in the header that is already there, so it costs no
+ * vertical space and does not compete with the question being asked.
+ *
+ * It does NOT alert anyone by itself. It opens the existing emergency screen, whose
+ * press-and-hold is what actually summons staff — so a mis-tap while navigating cannot
+ * raise a false alarm. Behaviour and semantics are the existing ones, unchanged.
+ *
+ * Not to be confused with declaring Anaphylaxis: that describes an allergy, this says
+ * something is happening now.
+ */
+const EmergencyButton = ({onOpen}:{onOpen:()=>void}) => (
+  <button className="emg" onClick={onOpen} aria-label="Medical Emergency" title="Medical Emergency">
+    <span className="emg-i" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+    </span>
+    {/* The word carries it, so nothing here depends on the colour. */}
+    <span className="emg-t">Emergency</span>
+  </button>
+)
+
 const ShieldIcon = ({size=20,color='#f59e0b'}:{size?:number,color?:string}) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -214,6 +240,14 @@ function App() {
   const [rehearsalAck, setRehearsalAck] = useState(false)
   /** Passport preview only. Nothing is collected, nothing is stored, nothing is claimed. */
   const [passportOpen, setPassportOpen] = useState(false)
+  /**
+   * Where the emergency screen goes back to.
+   *
+   * Someone reaching for help mid-flow must not be punished for it by losing six answers.
+   * The flow's own state is untouched while the emergency screen is up, so returning puts
+   * them back on the exact step they left.
+   */
+  const [urgentReturn, setUrgentReturn] = useState<Screen>('main')
   /**
    * Affirmative acknowledgment that this visit's allergy information may be shared with THIS
    * restaurant. Starts unchecked every time and is never remembered: it is permission for one
@@ -957,6 +991,9 @@ function App() {
    * name is the truest thing available and needs no taxonomy; "venue" is the fallback when
    * the name has not resolved, chosen because it assumes nothing.
    */
+  /** Open emergency help from wherever the guest is, and remember where to put them back. */
+  const openUrgent = (from: Screen) => { setUrgentReturn(from); go('urgent') }
+
   const venueName = venue?.name?.trim() || 'this venue'
   const venueOrThe = venue?.name?.trim() || 'the venue'
 
@@ -1392,6 +1429,7 @@ function App() {
                   : step === 'review' ? 'Review' : 'Allergies'}
               </span>
               {rehearsal && <span className="reh-pill">REHEARSAL</span>}
+              <EmergencyButton onOpen={() => openUrgent('allergy')}/>
             </div>
 
             <div className="scr">
@@ -1682,6 +1720,10 @@ function App() {
             and never re-reads the row. */}
         {screen === 'alwait' && (
           <div className="sc on" style={{position:'relative'}}>
+            <div className="sc-head sc-head--bare">
+              <span className="sc-head-title">Allergies</span>
+              <EmergencyButton onOpen={() => openUrgent('alwait')}/>
+            </div>
             <CloseX onClick={() => go('main')}/>
             <div className="ob">
               <div className="wi"><ShieldIcon size={28}/></div>
@@ -1752,6 +1794,7 @@ function App() {
                 Back
               </button>
               <span className="sc-head-title">Passport</span>
+              <EmergencyButton onOpen={() => { setPassportOpen(false); openUrgent('alwait') }}/>
             </div>
             <div className="scr">
               <div className="stp">
@@ -1786,6 +1829,10 @@ function App() {
         {/* ══ PROFILE ══ */}
         {screen === 'alack' && (
           <div className="sc on" style={{position:'relative'}}>
+            <div className="sc-head sc-head--bare">
+              <span className="sc-head-title">Allergies</span>
+              <EmergencyButton onOpen={() => openUrgent('alack')}/>
+            </div>
             <CloseX onClick={() => go('main')}/>
             <div className="ob">
               <div style={{width:'68px',height:'68px',background:'rgba(245,158,11,.08)',border:'2px solid #f59e0b',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'18px',boxShadow:'0 0 30px rgba(245,158,11,.2)'}}>
@@ -1813,7 +1860,7 @@ function App() {
         {/* ══ URGENT ══ */}
         {screen === 'urgent' && (
           <div className="sc on" style={{position:'relative'}}>
-            <CloseX onClick={() => { endHold(); go('main') }}/>
+            <CloseX onClick={() => { endHold(); go(urgentReturn); setUrgentReturn('main') }}/>
             <div className="ob">
               <div className="alert-icon"><HandIcon/></div>
               <div className="ot" style={{color:'var(--danger)'}}>Need Help Right Now?</div>

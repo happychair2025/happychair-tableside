@@ -1,0 +1,104 @@
+════ iPhone 390x664 ════
+PASS  EMG · available at rehearsal notice
+PASS  EMG · labelled Medical Emergency at rehearsal notice
+PASS  EMG · touch target >=44px at rehearsal notice
+PASS  EMG · word present, not colour-only at rehearsal notice
+PASS  EMG · available at first name
+PASS  EMG · labelled Medical Emergency at first name
+PASS  EMG · touch target >=44px at first name
+PASS  EMG · word present, not colour-only at first name
+PASS  EMG · still present with a field focused
+PASS  EMG · available at allergens
+PASS  EMG · labelled Medical Emergency at allergens
+PASS  EMG · touch target >=44px at allergens
+PASS  EMG · word present, not colour-only at allergens
+PASS  EMG · available at severity
+PASS  EMG · labelled Medical Emergency at severity
+PASS  EMG · touch target >=44px at severity
+PASS  EMG · word present, not colour-only at severity
+PASS  EMG · available at cross-contact
+PASS  EMG · labelled Medical Emergency at cross-contact
+PASS  EMG · touch target >=44px at cross-contact
+PASS  EMG · word present, not colour-only at cross-contact
+PASS  EMG · available at optional note
+PASS  EMG · labelled Medical Emergency at optional note
+PASS  EMG · touch target >=44px at optional note
+PASS  EMG · word present, not colour-only at optional note
+PASS  EMG · still present with the note field focused
+PASS  EMG · available at review
+PASS  EMG · labelled Medical Emergency at review
+PASS  EMG · touch target >=44px at review
+PASS  EMG · word present, not colour-only at review
+PASS  EMG · opens the existing emergency screen
+PASS  EMG · requires press-and-hold, no accidental alert
+PASS  EMG · opening it alerts nobody
+PASS  EMG · returns to the same step
+PASS  EMG · answers preserved
+PASS  EMG · acknowledgment not auto-granted
+PASS  EMG · present during rehearsal
+PASS  EMG · available at receipt / trust loop
+PASS  EMG · labelled Medical Emergency at receipt / trust loop
+PASS  EMG · touch target >=44px at receipt / trust loop
+PASS  EMG · word present, not colour-only at receipt / trust loop
+PASS  EMG · available at passport preview
+PASS  EMG · labelled Medical Emergency at passport preview
+PASS  EMG · touch target >=44px at passport preview
+PASS  EMG · word present, not colour-only at passport preview
+PASS  SEM · Anaphylaxis choice did not trigger emergency
+PASS  R · exactly one declaration
+PASS  R · disclosure version unchanged
+PASS  R · venue naming intact
+
+ALL 49 CHECKS PASS
+════ iPhone 390x560 ════
+PASS  EMG · available at rehearsal notice
+PASS  EMG · labelled Medical Emergency at rehearsal notice
+PASS  EMG · touch target >=44px at rehearsal notice
+PASS  EMG · word present, not colour-only at rehearsal notice
+PASS  EMG · available at first name
+PASS  EMG · labelled Medical Emergency at first name
+PASS  EMG · touch target >=44px at first name
+PASS  EMG · word present, not colour-only at first name
+PASS  EMG · still present with a field focused
+PASS  EMG · available at allergens
+PASS  EMG · labelled Medical Emergency at allergens
+PASS  EMG · touch target >=44px at allergens
+PASS  EMG · word present, not colour-only at allergens
+PASS  EMG · available at severity
+PASS  EMG · labelled Medical Emergency at severity
+PASS  EMG · touch target >=44px at severity
+PASS  EMG · word present, not colour-only at severity
+PASS  EMG · available at cross-contact
+PASS  EMG · labelled Medical Emergency at cross-contact
+PASS  EMG · touch target >=44px at cross-contact
+PASS  EMG · word present, not colour-only at cross-contact
+PASS  EMG · available at optional note
+PASS  EMG · labelled Medical Emergency at optional note
+PASS  EMG · touch target >=44px at optional note
+PASS  EMG · word present, not colour-only at optional note
+PASS  EMG · still present with the note field focused
+PASS  EMG · available at review
+PASS  EMG · labelled Medical Emergency at review
+PASS  EMG · touch target >=44px at review
+PASS  EMG · word present, not colour-only at review
+PASS  EMG · opens the existing emergency screen
+PASS  EMG · requires press-and-hold, no accidental alert
+PASS  EMG · opening it alerts nobody
+PASS  EMG · returns to the same step
+PASS  EMG · answers preserved
+PASS  EMG · acknowledgment not auto-granted
+PASS  EMG · present during rehearsal
+PASS  EMG · available at receipt / trust loop
+PASS  EMG · labelled Medical Emergency at receipt / trust loop
+PASS  EMG · touch target >=44px at receipt / trust loop
+PASS  EMG · word present, not colour-only at receipt / trust loop
+PASS  EMG · available at passport preview
+PASS  EMG · labelled Medical Emergency at passport preview
+PASS  EMG · touch target >=44px at passport preview
+PASS  EMG · word present, not colour-only at passport preview
+PASS  SEM · Anaphylaxis choice did not trigger emergency
+PASS  R · exactly one declaration
+PASS  R · disclosure version unchanged
+PASS  R · venue naming intact
+
+ALL 49 CHECKS PASS
