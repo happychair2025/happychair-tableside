@@ -1,0 +1,164 @@
+════════ iPhone 390x664 · logo present ════════
+      [script reached]
+
+── B · VENUE LOGO ON THE GUEST SURFACE ──
+PASS  B · the venue identity badge renders
+PASS  B · logo renders as an image in the badge   → IMG
+PASS  B · it is the venue logo the venues row provided
+PASS  B · the initial letter is not shown alongside it   → ""
+PASS  B · image actually decoded (non-zero natural size)   → 2x2
+PASS  B · badge keeps its 70px footprint   → 70x70
+PASS  B · logo is contained, never cropped   → contain
+PASS  B · white backing so dark marks stay legible   → rgb(255, 255, 255)
+PASS  B · logo is decorative, not announced twice to a screen reader   → ""
+PASS  B · a broken logo falls back to the initial letter   → "H"
+PASS  B · venue name still renders
+
+── C · RECEIPT CARD: QUIET AND SECONDARY ──
+PASS  C · the receipt is what the guest lands on
+PASS  C · exactly one Passport card on the receipt   → count=1
+PASS  C · title   → "Happy Chair Passport"
+PASS  C · lead   → "Don’t enter this again next time."
+PASS  C · body   → "Save your allergies and review them before sharing at any participating Happy Chair venue."
+PASS  C · CTA is a link to learn, not an offer to set up   → "Learn about Passport →"
+PASS  C · no set-up / sign-up language anywhere on the receipt
+PASS  C · the card sits below the receipt, not above it   → receipt title bottom 278 < card top 464
+PASS  C · the card is visually secondary (muted body, no primary fill)   → rgb(148, 163, 184)
+
+── C · PREVIEW: RESTRAINT ──
+PASS  C · preview title   → "Happy Chair Passport"
+PASS  C · preview lead   → "Your allergies. Ready when you are."
+PASS  C · first paragraph   → "Save your allergy information once. At participating Happy Chair venues, review it and choose when to share it."
+PASS  C · second paragraph   → "You stay in control. Nothing is shared automatically."
+PASS  C · exactly two paragraphs — nothing else added   → count=2
+PASS  C · "Coming soon" is present   → "Coming soon"
+PASS  C · numbered 1-2-3 process is gone
+PASS  C · the boxed notice block is gone
+PASS  C · no registration affordance in the preview   → Emergency | Learn about Passport → | Back | Emergency | Back to your confirmation
+PASS  C · the preview writes nothing   → calls: 0
+PASS  C · emergency still reachable from the preview
+PASS  C · clear type hierarchy title > lead   → 24px vs 15px
+      preview visible text: REHEARSAL Happy Bistro is testing Happy Chair at this table. Anything you send reaches real staff. Allergies Emergency Allergy Information Sent Happy Chair received your allergy information for Happy 
+PASS  C · Back returns to the receipt
+
+ALL 33 CHECKS PASS
+════════ iPhone 390x664 · no logo (fallback) ════════
+      [script reached]
+
+── B · VENUE LOGO ON THE GUEST SURFACE ──
+PASS  B · the venue identity badge renders
+PASS  B · no logo → initial-letter fallback, no img   → "H"
+PASS  B · fallback badge keeps its size   → 70x70
+PASS  B · fallback keeps the brand badge fill, not white   → linear-gradient(135deg, rgb(34, 211, 238
+PASS  B · venue name still renders
+
+── C · RECEIPT CARD: QUIET AND SECONDARY ──
+PASS  C · the receipt is what the guest lands on
+PASS  C · exactly one Passport card on the receipt   → count=1
+PASS  C · title   → "Happy Chair Passport"
+PASS  C · lead   → "Don’t enter this again next time."
+PASS  C · body   → "Save your allergies and review them before sharing at any participating Happy Chair venue."
+PASS  C · CTA is a link to learn, not an offer to set up   → "Learn about Passport →"
+PASS  C · no set-up / sign-up language anywhere on the receipt
+PASS  C · the card sits below the receipt, not above it   → receipt title bottom 278 < card top 464
+PASS  C · the card is visually secondary (muted body, no primary fill)   → rgb(148, 163, 184)
+
+── C · PREVIEW: RESTRAINT ──
+PASS  C · preview title   → "Happy Chair Passport"
+PASS  C · preview lead   → "Your allergies. Ready when you are."
+PASS  C · first paragraph   → "Save your allergy information once. At participating Happy Chair venues, review it and choose when to share it."
+PASS  C · second paragraph   → "You stay in control. Nothing is shared automatically."
+PASS  C · exactly two paragraphs — nothing else added   → count=2
+PASS  C · "Coming soon" is present   → "Coming soon"
+PASS  C · numbered 1-2-3 process is gone
+PASS  C · the boxed notice block is gone
+PASS  C · no registration affordance in the preview   → Emergency | Learn about Passport → | Back | Emergency | Back to your confirmation
+PASS  C · the preview writes nothing   → calls: 0
+PASS  C · emergency still reachable from the preview
+PASS  C · clear type hierarchy title > lead   → 24px vs 15px
+      preview visible text: REHEARSAL Happy Bistro is testing Happy Chair at this table. Anything you send reaches real staff. Allergies Emergency Allergy Information Sent Happy Chair received your allergy information for Happy 
+PASS  C · Back returns to the receipt
+
+ALL 27 CHECKS PASS
+════════ iPhone 390x560 · logo present ════════
+      [script reached]
+
+── B · VENUE LOGO ON THE GUEST SURFACE ──
+PASS  B · the venue identity badge renders
+PASS  B · logo renders as an image in the badge   → IMG
+PASS  B · it is the venue logo the venues row provided
+PASS  B · the initial letter is not shown alongside it   → ""
+PASS  B · image actually decoded (non-zero natural size)   → 2x2
+PASS  B · badge keeps its 70px footprint   → 70x70
+PASS  B · logo is contained, never cropped   → contain
+PASS  B · white backing so dark marks stay legible   → rgb(255, 255, 255)
+PASS  B · logo is decorative, not announced twice to a screen reader   → ""
+PASS  B · a broken logo falls back to the initial letter   → "H"
+PASS  B · venue name still renders
+
+── C · RECEIPT CARD: QUIET AND SECONDARY ──
+PASS  C · the receipt is what the guest lands on
+PASS  C · exactly one Passport card on the receipt   → count=1
+PASS  C · title   → "Happy Chair Passport"
+PASS  C · lead   → "Don’t enter this again next time."
+PASS  C · body   → "Save your allergies and review them before sharing at any participating Happy Chair venue."
+PASS  C · CTA is a link to learn, not an offer to set up   → "Learn about Passport →"
+PASS  C · no set-up / sign-up language anywhere on the receipt
+PASS  C · the card sits below the receipt, not above it   → receipt title bottom 278 < card top 464
+PASS  C · the card is visually secondary (muted body, no primary fill)   → rgb(148, 163, 184)
+
+── C · PREVIEW: RESTRAINT ──
+PASS  C · preview title   → "Happy Chair Passport"
+PASS  C · preview lead   → "Your allergies. Ready when you are."
+PASS  C · first paragraph   → "Save your allergy information once. At participating Happy Chair venues, review it and choose when to share it."
+PASS  C · second paragraph   → "You stay in control. Nothing is shared automatically."
+PASS  C · exactly two paragraphs — nothing else added   → count=2
+PASS  C · "Coming soon" is present   → "Coming soon"
+PASS  C · numbered 1-2-3 process is gone
+PASS  C · the boxed notice block is gone
+PASS  C · no registration affordance in the preview   → Emergency | Learn about Passport → | Back | Emergency | Back to your confirmation
+PASS  C · the preview writes nothing   → calls: 0
+PASS  C · emergency still reachable from the preview
+PASS  C · clear type hierarchy title > lead   → 24px vs 15px
+      preview visible text: REHEARSAL Happy Bistro is testing Happy Chair at this table. Anything you send reaches real staff. Allergies Emergency Allergy Information Sent Happy Chair received your allergy information for Happy 
+PASS  C · Back returns to the receipt
+
+ALL 33 CHECKS PASS
+════════ iPhone 390x560 · no logo (fallback) ════════
+      [script reached]
+
+── B · VENUE LOGO ON THE GUEST SURFACE ──
+PASS  B · the venue identity badge renders
+PASS  B · no logo → initial-letter fallback, no img   → "H"
+PASS  B · fallback badge keeps its size   → 70x70
+PASS  B · fallback keeps the brand badge fill, not white   → linear-gradient(135deg, rgb(34, 211, 238
+PASS  B · venue name still renders
+
+── C · RECEIPT CARD: QUIET AND SECONDARY ──
+PASS  C · the receipt is what the guest lands on
+PASS  C · exactly one Passport card on the receipt   → count=1
+PASS  C · title   → "Happy Chair Passport"
+PASS  C · lead   → "Don’t enter this again next time."
+PASS  C · body   → "Save your allergies and review them before sharing at any participating Happy Chair venue."
+PASS  C · CTA is a link to learn, not an offer to set up   → "Learn about Passport →"
+PASS  C · no set-up / sign-up language anywhere on the receipt
+PASS  C · the card sits below the receipt, not above it   → receipt title bottom 278 < card top 464
+PASS  C · the card is visually secondary (muted body, no primary fill)   → rgb(148, 163, 184)
+
+── C · PREVIEW: RESTRAINT ──
+PASS  C · preview title   → "Happy Chair Passport"
+PASS  C · preview lead   → "Your allergies. Ready when you are."
+PASS  C · first paragraph   → "Save your allergy information once. At participating Happy Chair venues, review it and choose when to share it."
+PASS  C · second paragraph   → "You stay in control. Nothing is shared automatically."
+PASS  C · exactly two paragraphs — nothing else added   → count=2
+PASS  C · "Coming soon" is present   → "Coming soon"
+PASS  C · numbered 1-2-3 process is gone
+PASS  C · the boxed notice block is gone
+PASS  C · no registration affordance in the preview   → Emergency | Learn about Passport → | Back | Emergency | Back to your confirmation
+PASS  C · the preview writes nothing   → calls: 0
+PASS  C · emergency still reachable from the preview
+PASS  C · clear type hierarchy title > lead   → 24px vs 15px
+      preview visible text: REHEARSAL Happy Bistro is testing Happy Chair at this table. Anything you send reaches real staff. Allergies Emergency Allergy Information Sent Happy Chair received your allergy information for Happy 
+PASS  C · Back returns to the receipt
+
+ALL 27 CHECKS PASS

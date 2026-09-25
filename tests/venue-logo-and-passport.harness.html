@@ -1,0 +1,120 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="stylesheet" href="/app.css"></head>
+<body><div id="root"></div><pre id="err" style="color:#f88;font:10px monospace"></pre>
+<script>
+// Must run BEFORE the app boots. `?nologo=1` drives the fallback case.
+window.NOLOGO = /nologo=1/.test(location.search); var NOLOGO = window.NOLOGO;
+// 2x2 solid red PNG — small, and visibly not the letter badge.
+var PX = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFUlEQVR4nGP8z8DAwMDAxMDAwMAAAA8bAQ2z0m4qAAAAAElFTkSuQmCC";
+window.__ROWS__ = { venues: {id:'v1', name:'Happy Bistro'} };
+window.__LOGO__ = NOLOGO ? null : PX;   // what guest_venue_branding returns
+window.onerror=function(m,f,l){var t="BOOTERR "+m+" @"+f+":"+l;
+  document.getElementById("err").textContent+=t+"\n";
+  try{fetch('/__results',{method:'POST',body:t})}catch(e){}};
+</script>
+<script src="/bundle.js"></script>
+<script>
+const w=ms=>new Promise(r=>setTimeout(r,ms)); const f=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+const T=[];let pass=0,fail=0;
+const ok=(n,c,x)=>{c?pass++:fail++;T.push((c?'PASS  ':'FAIL  ')+n+(x!==undefined&&x!==''?'   → '+x:''))};
+const info=s=>T.push('      '+s); const hd=s=>{T.push('');T.push(s)};
+const q=s=>document.querySelector(s); const all=s=>[...document.querySelectorAll(s)];
+const txt=()=>document.body.innerText;
+const btn=re=>all('button').filter(b=>re.test((b.textContent||'').trim())).sort((a,b)=>a.textContent.length-b.textContent.length)[0];
+const tap=async e=>{e.click();await f();await w(170)};
+const setVal=async(e,v)=>{const p=e.tagName==='TEXTAREA'?HTMLTextAreaElement:HTMLInputElement;
+  Object.getOwnPropertyDescriptor(p.prototype,'value').set.call(e,v);e.dispatchEvent(new Event('input',{bubbles:true}));await f();await w(120)};
+const stepQ=()=>q('.stp-q')?.textContent.trim()||'';
+const chip=n=>all('.chip').find(c=>c.textContent.trim().replace(/^✓/,'').trim()===n);
+const R=e=>e.getBoundingClientRect();
+(async()=>{
+ try{
+  try{await fetch('/__results',{method:'POST',body:'      [script reached]'})}catch(e){}
+  await w(900);
+  hd('── B · VENUE LOGO ON THE GUEST SURFACE ──');
+  const badge=q('.ib');
+  ok('B · the venue identity badge renders', !!badge);
+  const img=q('.ib .ib-img');
+  if(window.NOLOGO){
+    ok('B · no logo → initial-letter fallback, no img', !img && badge.textContent.trim()==='H',
+       JSON.stringify(badge.textContent.trim()));
+    ok('B · fallback badge keeps its size', Math.round(R(badge).width)===70&&Math.round(R(badge).height)===70,
+       Math.round(R(badge).width)+'x'+Math.round(R(badge).height));
+    ok('B · fallback keeps the brand badge fill, not white',
+       getComputedStyle(badge).backgroundImage.includes('gradient'), getComputedStyle(badge).backgroundImage.slice(0,40));
+  } else {
+    ok('B · logo renders as an image in the badge', !!img, img?img.tagName:'none');
+    ok('B · it is the venue logo the venues row provided', !!img && img.src===window.__LOGO__);
+    ok('B · the initial letter is not shown alongside it', badge.textContent.trim()==='', JSON.stringify(badge.textContent.trim()));
+    ok('B · image actually decoded (non-zero natural size)', img.naturalWidth>0, img.naturalWidth+'x'+img.naturalHeight);
+    ok('B · badge keeps its 70px footprint', Math.round(R(badge).width)===70&&Math.round(R(badge).height)===70,
+       Math.round(R(badge).width)+'x'+Math.round(R(badge).height));
+    ok('B · logo is contained, never cropped', getComputedStyle(img).objectFit==='contain', getComputedStyle(img).objectFit);
+    ok('B · white backing so dark marks stay legible',
+       getComputedStyle(badge).backgroundColor==='rgb(255, 255, 255)', getComputedStyle(badge).backgroundColor);
+    ok('B · logo is decorative, not announced twice to a screen reader', img.getAttribute('alt')==='', JSON.stringify(img.getAttribute('alt')));
+    // a broken logo must fall back, not leave a hole
+    img.dispatchEvent(new Event('error')); await f(); await w(150);
+    ok('B · a broken logo falls back to the initial letter', !q('.ib .ib-img') && q('.ib').textContent.trim()==='H',
+       JSON.stringify(q('.ib').textContent.trim()));
+  }
+  ok('B · venue name still renders', /Happy Bistro/.test(txt()));
+
+  hd('── C · RECEIPT CARD: QUIET AND SECONDARY ──');
+  await tap(btn(/Food Allergy/i)); await tap(btn(/^Got it$/));
+  await setVal(q('.fld'),'Tom'); await tap(btn(/^Continue/)); await w(220);
+  await tap(chip('Peanuts')); await tap(btn(/^Continue/));
+  await tap(all('.opt')[3]); await tap(btn(/^Continue$/));
+  await tap(all('.opt')[0]); await tap(btn(/^Continue$/));
+  await tap(btn(/^Skip$/));
+  await tap(q('.dsc-ack input')); await tap(btn(/^Tell Happy Bistro$/)); await w(900);
+  ok('C · the receipt is what the guest lands on', /Allergy Information Sent/i.test(txt()));
+  const card=q('.psp');
+  ok('C · exactly one Passport card on the receipt', all('.psp').length===1, 'count='+all('.psp').length);
+  ok('C · title', q('.psp-t')?.textContent.trim()==='Happy Chair Passport', JSON.stringify(q('.psp-t')?.textContent.trim()));
+  ok('C · lead', q('.psp-l')?.textContent.trim()==='Don’t enter this again next time.', JSON.stringify(q('.psp-l')?.textContent.trim()));
+  ok('C · body', q('.psp-b')?.textContent.replace(/\s+/g,' ').trim()===
+     'Save your allergies and review them before sharing at any participating Happy Chair venue.',
+     JSON.stringify(q('.psp-b')?.textContent.replace(/\s+/g,' ').trim()));
+  ok('C · CTA is a link to learn, not an offer to set up',
+     /^Learn about Passport\s*→?$/.test(q('.psp-cta')?.textContent.trim()), JSON.stringify(q('.psp-cta')?.textContent.trim()));
+  ok('C · no set-up / sign-up language anywhere on the receipt',
+     !/Set Up My Passport|Create Free Profile|Create Account|Sign up/i.test(txt()));
+  const recBox=R(q('.ob')||document.body), cardBox=R(card);
+  const receiptTitle=q('.ot');
+  ok('C · the card sits below the receipt, not above it', cardBox.top > R(receiptTitle).bottom,
+     'receipt title bottom '+Math.round(R(receiptTitle).bottom)+' < card top '+Math.round(cardBox.top));
+  ok('C · the card is visually secondary (muted body, no primary fill)',
+     getComputedStyle(q('.psp-b')).color===getComputedStyle(document.documentElement).getPropertyValue('--t2').trim()
+     || /148|156|163/.test(getComputedStyle(q('.psp-b')).color), getComputedStyle(q('.psp-b')).color);
+  const before=(window.__CALLS__||[]).length;
+
+  hd('── C · PREVIEW: RESTRAINT ──');
+  await tap(q('.psp-cta')); await w(200);
+  ok('C · preview title', stepQ()==='Happy Chair Passport', JSON.stringify(stepQ()));
+  ok('C · preview lead', q('.stp-s')?.textContent.trim()==='Your allergies. Ready when you are.', JSON.stringify(q('.stp-s')?.textContent.trim()));
+  const bodies=all('.psp-body').map(e=>e.textContent.replace(/\s+/g,' ').trim());
+  ok('C · first paragraph', bodies[0]==='Save your allergy information once. At participating Happy Chair venues, review it and choose when to share it.', JSON.stringify(bodies[0]));
+  ok('C · second paragraph', bodies[1]==='You stay in control. Nothing is shared automatically.', JSON.stringify(bodies[1]));
+  ok('C · exactly two paragraphs — nothing else added', bodies.length===2, 'count='+bodies.length);
+  ok('C · "Coming soon" is present', /Coming soon/i.test(q('.psp-soon')?.textContent||''), JSON.stringify(q('.psp-soon')?.textContent.trim()));
+  ok('C · numbered 1-2-3 process is gone', all('.psp-step').length===0 && all('.psp-n').length===0);
+  ok('C · the boxed notice block is gone', all('.psp-note').length===0);
+  ok('C · no registration affordance in the preview',
+     !all('button').some(b=>/create|sign ?up|set up|register|get started/i.test(b.textContent)),
+     all('button').map(b=>b.textContent.trim()).join(' | '));
+  ok('C · the preview writes nothing', (window.__CALLS__||[]).length===before, 'calls: '+((window.__CALLS__||[]).length-before));
+  ok('C · emergency still reachable from the preview', !!q('.sc.on .emg'));
+  // whitespace / hierarchy: the lead is clearly subordinate to the title
+  const t=parseFloat(getComputedStyle(q('.stp-q')).fontSize), l=parseFloat(getComputedStyle(q('.stp-s')).fontSize);
+  ok('C · clear type hierarchy title > lead', t>l, t+'px vs '+l+'px');
+  info('preview visible text: '+txt().replace(/\s+/g,' ').trim().slice(0,200));
+  await tap(btn(/^Back$/));
+  ok('C · Back returns to the receipt', /Allergy Information Sent/i.test(txt()));
+ }catch(e){T.push('THREW: '+e.message+' @ '+(e.stack||'').split('\n')[1]);fail++}
+ T.push(''); T.push(fail===0?('ALL '+pass+' CHECKS PASS'):(pass+' pass, '+fail+' FAIL'));
+ const o=document.createElement('pre');o.id='res';o.textContent=T.join('\n');document.body.appendChild(o);
+ try{await fetch('/__results',{method:'POST',body:T.join('\n')})}catch(e){}
+})();
+</script></body></html>

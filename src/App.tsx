@@ -131,6 +131,27 @@ const EmergencyButton = ({onOpen}:{onOpen:()=>void}) => (
   </button>
 )
 
+/**
+ * The single Passport entry point. One definition, used by every post-submit state, because
+ * two different Passport pitches on two adjacent screens is how the copy drifts apart.
+ *
+ * Quiet by construction: what just happened is the guest telling this venue, and that is the
+ * primary thing on the screen. This is a link, not an offer — it stores nothing, collects
+ * nothing, and does not imply a profile exists.
+ */
+const PassportCard = ({onOpen}:{onOpen:()=>void}) => (
+  <div className="psp">
+    <div className="psp-t">Happy Chair Passport</div>
+    <div className="psp-l">Don&rsquo;t enter this again next time.</div>
+    <div className="psp-b">
+      Save your allergies and review them before sharing at any participating Happy Chair venue.
+    </div>
+    <button className="psp-cta" onClick={onOpen}>
+      Learn about Passport <span aria-hidden="true">→</span>
+    </button>
+  </div>
+)
+
 const ShieldIcon = ({size=20,color='#f59e0b'}:{size?:number,color?:string}) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -291,6 +312,11 @@ function App() {
   const tableParam = params.get('table') || params.get('t') || params.get('asset')
   const [assetId, setAssetId] = useState<string | null>(tableParam)
   const [resolvedVenueId, setResolvedVenueId] = useState<string | null>(venueId)
+  // The venue's own logo. Held apart from `venue` because it is deliberately NOT part of the
+  // boot query: the stored value is a base64 data URL (Happy Bistro's is 1.2 MB), and putting
+  // it on the critical path would delay the first screen a guest sees. Fetched once the venue
+  // has resolved and the app is already usable; until it arrives the initial badge stands.
+  const [venueLogo, setVenueLogo] = useState<string | null>(null)
 
   /**
    * Which identifier the guest arrived on.
@@ -994,6 +1020,24 @@ function App() {
   /** Open emergency help from wherever the guest is, and remember where to put them back. */
   const openUrgent = (from: Screen) => { setUrgentReturn(from); go('urgent') }
 
+  // Venue branding, resolved the same way every other guest-facing fact is: server-side from
+  // the opaque code. A client-side `venues` read is not available here and should not be — the
+  // /t/<code> path deliberately never gives this browser a venue id, and a logo is not a reason
+  // to change that. Fetched after the venue has resolved rather than during boot, because the
+  // stored value is a base64 data URL (1.2 MB at Happy Bistro) and the first screen must not
+  // wait on it. Silent on failure: the venue initial is a complete fallback, not a placeholder.
+  useEffect(() => {
+    if (!permanentCode || !venue) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase.rpc('guest_venue_branding', { p_code: permanentCode })
+      const row = Array.isArray(data) ? data[0] : data
+      const url = row?.logo_url
+      if (!cancelled && typeof url === 'string' && url.trim()) setVenueLogo(url.trim())
+    })()
+    return () => { cancelled = true }
+  }, [permanentCode, venue])
+
   const venueName = venue?.name?.trim() || 'this venue'
   const venueOrThe = venue?.name?.trim() || 'the venue'
 
@@ -1250,7 +1294,11 @@ function App() {
 
             {/* Venue header */}
             <div className="vh">
-              <div className="ib">{venue?.name?.charAt(0) || 'H'}</div>
+              <div className="ib">
+                {venueLogo
+                  ? <img className="ib-img" src={venueLogo} alt="" onError={() => setVenueLogo(null)}/>
+                  : venue?.name?.charAt(0) || 'H'}
+              </div>
               {/* The demo venue's name used to render here whenever the venue row had not
                   loaded — so a guest at any restaurant could be shown "Happy Bistro" on
                   their own table's screen. When we do not know whose dining room this is,
@@ -1767,18 +1815,7 @@ function App() {
                   stores nothing, collects nothing and claims nothing has been saved, because
                   nothing has. Passport data must never become a declaration on its own — a
                   guest tells a venue, explicitly, every visit. */}
-              <div className="psp">
-                <div className="psp-t">Happy Chair Passport</div>
-                <div className="psp-l">Take your allergies with you.</div>
-                <div className="psp-b">
-                  Save your allergy profile once, then review and share it when you visit any
-                  participating Happy Chair venue.
-                </div>
-                <button className="psp-cta" onClick={() => setPassportOpen(true)}>
-                  Set Up My Passport <span aria-hidden="true">→</span>
-                </button>
-                <div className="psp-r">You&rsquo;re always in control of what you share.</div>
-              </div>
+              <PassportCard onOpen={() => setPassportOpen(true)}/>
             </div>
           </div>
         )}
@@ -1794,31 +1831,26 @@ function App() {
                 Back
               </button>
               <span className="sc-head-title">Passport</span>
-              <EmergencyButton onOpen={() => { setPassportOpen(false); openUrgent('alwait') }}/>
+              {/* Now reachable from either post-submit state, so return to whichever it was. */}
+              <EmergencyButton onOpen={() => { setPassportOpen(false); openUrgent(screen === 'alack' ? 'alack' : 'alwait') }}/>
             </div>
             <div className="scr">
               <div className="stp">
                 <h1 className="stp-q">Happy Chair Passport</h1>
-                <p className="stp-s">Take your allergies with you.</p>
+                <p className="stp-s">Your allergies. Ready when you are.</p>
 
-                <div className="psp-step">
-                  <span className="psp-n">1</span>
-                  <span>Save your allergy profile once — your allergies, how serious each one is, and anything you want staff to know.</span>
-                </div>
-                <div className="psp-step">
-                  <span className="psp-n">2</span>
-                  <span>Arrive at any participating Happy Chair venue and your profile is ready for you to check.</span>
-                </div>
-                <div className="psp-step">
-                  <span className="psp-n">3</span>
-                  <span>Review and change anything for that visit, then choose to tell that venue. Nothing is ever sent for you.</span>
-                </div>
+                <p className="psp-body">
+                  Save your allergy information once. At participating Happy Chair venues,
+                  review it and choose when to share it.
+                </p>
+                <p className="psp-body">
+                  You stay in control. Nothing is shared automatically.
+                </p>
 
-                <div className="psp-note">
-                  <strong>Not available yet.</strong> Passport is in development and cannot be set
-                  up during this test. Nothing has been saved, and no allergy profile exists yet.
-                </div>
-                <div className="psp-r">You&rsquo;re always in control of what you share.</div>
+                {/* A state, not an action. There is no set-up affordance here because there is
+                    nothing to set up yet — which is also why nothing needs to say "nothing was
+                    saved": the screen never offers to save anything. */}
+                <div className="psp-soon">Coming soon</div>
 
                 <button className="sbtn" onClick={() => setPassportOpen(false)}>Back to your confirmation</button>
               </div>
@@ -1840,19 +1872,10 @@ function App() {
               </div>
               <div className="ot" style={{color:'#f59e0b'}}>You're All Set</div>
               <div className="os">Your server and kitchen have been notified.</div>
-              <div style={{width:'60px',height:'1px',background:'var(--b)',margin:'28px 0'}}/>
-              <div style={{background:'var(--s1)',border:'1px solid var(--b)',borderRadius:'18px',padding:'28px 24px',maxWidth:'320px',width:'100%'}}>
-                <div style={{textAlign:'center',marginBottom:'8px'}}>
-                  <svg width="48" height="60" viewBox="0 0 72.71 90.04">
-                    <path fill="#22d3ee" d="M36.36,0C16.28,0,.6,16.3.01,36.36c-.64,21.77,29.31,48.22,35.31,53.29.61.52,1.48.52,2.08,0,5.96-4.98,35.31-30.65,35.31-53.31C72.71,16.27,56.43,0,36.36,0z"/>
-                    <path fill="#fff" d="M25.11,17.28c0-1.61,1.3-2.91,2.91-2.91s2.91,1.3,2.91,2.91v12.86h13.77c1.61,0,2.91,1.3,2.91,2.91v14.3c0,1.6-1.3,2.91-2.91,2.91s-2.91-1.31-2.91-2.91v-11.4h-10.86v11.98c0,1.6-1.31,2.91-2.91,2.91s-2.91-1.31-2.91-2.91v-30.65z"/>
-                    <path fill="#fff" d="M56.41,54.42c-3.84,7.64-11.53,12.39-20.07,12.39s-16.31-4.87-20.07-12.4c-.71-1.44-.12-3.18,1.31-3.9,1.44-.71,3.18-.12,3.9,1.31,2.77,5.57,8.61,9.18,14.86,9.18s12.02-3.52,14.87-9.19c.73-1.43,2.47-2.01,3.9-1.28,1.44.71,2.02,2.47,1.3,3.9z"/>
-                  </svg>
-                </div>
-                <div style={{color:'#f59e0b',fontSize:'15px',fontWeight:600,marginBottom:'18px',textAlign:'center'}}>Your allergy details, anywhere.</div>
-                <div style={{color:'var(--t1)',fontSize:'14px',lineHeight:1.6,maxWidth:'260px',margin:'0 auto 24px',fontWeight:500,textAlign:'center'}}>One tap to share at any venue.<br/>You're always in control.</div>
-                <button className="pb" style={{width:'100%'}}>Create Free Profile</button>
-              </div>
+              {/* Was a boxed pitch with its own wording and a "Create Free Profile" button that
+                  had no handler at all — a primary-styled control promising account creation
+                  and doing nothing. Replaced by the same quiet card the receipt uses. */}
+              <PassportCard onOpen={() => setPassportOpen(true)}/>
             </div>
           </div>
         )}
