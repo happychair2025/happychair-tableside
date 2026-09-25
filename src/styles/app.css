@@ -410,6 +410,7 @@ html,body{height:100%;background:#0d1117;font-family:-apple-system,BlinkMacSyste
 .psp-b{font-size:14px;line-height:1.55;color:var(--t2);margin-bottom:16px}
 .psp-body{font-size:15px;line-height:1.62;color:var(--t2);margin:0 0 16px;max-width:34em}
 .psp-soon{margin-top:26px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t2)}
+.psp-yet{margin:6px 0 0;font-size:13.5px;line-height:1.5;color:var(--t2)}
 .psp-cta{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:50px;
   background:transparent;border:1.5px solid var(--cyan);border-radius:12px;color:var(--cyan);
   font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}

@@ -99,6 +99,14 @@ const R=e=>e.getBoundingClientRect();
   ok('C · second paragraph', bodies[1]==='You stay in control. Nothing is shared automatically.', JSON.stringify(bodies[1]));
   ok('C · exactly two paragraphs — nothing else added', bodies.length===2, 'count='+bodies.length);
   ok('C · "Coming soon" is present', /Coming soon/i.test(q('.psp-soon')?.textContent||''), JSON.stringify(q('.psp-soon')?.textContent.trim()));
+  ok('C · "Nothing is saved to Passport yet." is present',
+     q('.psp-yet')?.textContent.trim()==='Nothing is saved to Passport yet.', JSON.stringify(q('.psp-yet')?.textContent.trim()));
+  ok('C · it is one quiet line, not a boxed notice',
+     all('.psp-yet').length===1 && getComputedStyle(q('.psp-yet')).borderTopWidth==='0px'
+       && ['rgba(0, 0, 0, 0)','transparent'].includes(getComputedStyle(q('.psp-yet')).backgroundColor),
+     'border '+getComputedStyle(q('.psp-yet')).borderTopWidth+', bg '+getComputedStyle(q('.psp-yet')).backgroundColor);
+  ok('C · still exactly two body paragraphs — no extra explanation', all('.psp-body').length===2, 'count='+all('.psp-body').length);
+  ok('C · the old boxed notice is still gone', all('.psp-note').length===0);
   ok('C · numbered 1-2-3 process is gone', all('.psp-step').length===0 && all('.psp-n').length===0);
   ok('C · the boxed notice block is gone', all('.psp-note').length===0);
   ok('C · no registration affordance in the preview',

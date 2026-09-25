@@ -32,6 +32,10 @@ PASS  C · first paragraph   → "Save your allergy information once. At partici
 PASS  C · second paragraph   → "You stay in control. Nothing is shared automatically."
 PASS  C · exactly two paragraphs — nothing else added   → count=2
 PASS  C · "Coming soon" is present   → "Coming soon"
+PASS  C · "Nothing is saved to Passport yet." is present   → "Nothing is saved to Passport yet."
+PASS  C · it is one quiet line, not a boxed notice   → border 0px, bg rgba(0, 0, 0, 0)
+PASS  C · still exactly two body paragraphs — no extra explanation   → count=2
+PASS  C · the old boxed notice is still gone
 PASS  C · numbered 1-2-3 process is gone
 PASS  C · the boxed notice block is gone
 PASS  C · no registration affordance in the preview   → Emergency | Learn about Passport → | Back | Emergency | Back to your confirmation
@@ -41,7 +45,7 @@ PASS  C · clear type hierarchy title > lead   → 24px vs 15px
       preview visible text: REHEARSAL Happy Bistro is testing Happy Chair at this table. Anything you send reaches real staff. Allergies Emergency Allergy Information Sent Happy Chair received your allergy information for Happy 
 PASS  C · Back returns to the receipt
 
-ALL 33 CHECKS PASS
+ALL 37 CHECKS PASS
 ════════ iPhone 390x664 · no logo (fallback) ════════
       [script reached]
 
@@ -70,6 +74,10 @@ PASS  C · first paragraph   → "Save your allergy information once. At partici
 PASS  C · second paragraph   → "You stay in control. Nothing is shared automatically."
 PASS  C · exactly two paragraphs — nothing else added   → count=2
 PASS  C · "Coming soon" is present   → "Coming soon"
+PASS  C · "Nothing is saved to Passport yet." is present   → "Nothing is saved to Passport yet."
+PASS  C · it is one quiet line, not a boxed notice   → border 0px, bg rgba(0, 0, 0, 0)
+PASS  C · still exactly two body paragraphs — no extra explanation   → count=2
+PASS  C · the old boxed notice is still gone
 PASS  C · numbered 1-2-3 process is gone
 PASS  C · the boxed notice block is gone
 PASS  C · no registration affordance in the preview   → Emergency | Learn about Passport → | Back | Emergency | Back to your confirmation
@@ -79,7 +87,7 @@ PASS  C · clear type hierarchy title > lead   → 24px vs 15px
       preview visible text: REHEARSAL Happy Bistro is testing Happy Chair at this table. Anything you send reaches real staff. Allergies Emergency Allergy Information Sent Happy Chair received your allergy information for Happy 
 PASS  C · Back returns to the receipt
 
-ALL 27 CHECKS PASS
+ALL 31 CHECKS PASS
 ════════ iPhone 390x560 · logo present ════════
       [script reached]
 
@@ -114,6 +122,10 @@ PASS  C · first paragraph   → "Save your allergy information once. At partici
 PASS  C · second paragraph   → "You stay in control. Nothing is shared automatically."
 PASS  C · exactly two paragraphs — nothing else added   → count=2
 PASS  C · "Coming soon" is present   → "Coming soon"
+PASS  C · "Nothing is saved to Passport yet." is present   → "Nothing is saved to Passport yet."
+PASS  C · it is one quiet line, not a boxed notice   → border 0px, bg rgba(0, 0, 0, 0)
+PASS  C · still exactly two body paragraphs — no extra explanation   → count=2
+PASS  C · the old boxed notice is still gone
 PASS  C · numbered 1-2-3 process is gone
 PASS  C · the boxed notice block is gone
 PASS  C · no registration affordance in the preview   → Emergency | Learn about Passport → | Back | Emergency | Back to your confirmation
@@ -123,7 +135,7 @@ PASS  C · clear type hierarchy title > lead   → 24px vs 15px
       preview visible text: REHEARSAL Happy Bistro is testing Happy Chair at this table. Anything you send reaches real staff. Allergies Emergency Allergy Information Sent Happy Chair received your allergy information for Happy 
 PASS  C · Back returns to the receipt
 
-ALL 33 CHECKS PASS
+ALL 37 CHECKS PASS
 ════════ iPhone 390x560 · no logo (fallback) ════════
       [script reached]
 
@@ -152,6 +164,10 @@ PASS  C · first paragraph   → "Save your allergy information once. At partici
 PASS  C · second paragraph   → "You stay in control. Nothing is shared automatically."
 PASS  C · exactly two paragraphs — nothing else added   → count=2
 PASS  C · "Coming soon" is present   → "Coming soon"
+PASS  C · "Nothing is saved to Passport yet." is present   → "Nothing is saved to Passport yet."
+PASS  C · it is one quiet line, not a boxed notice   → border 0px, bg rgba(0, 0, 0, 0)
+PASS  C · still exactly two body paragraphs — no extra explanation   → count=2
+PASS  C · the old boxed notice is still gone
 PASS  C · numbered 1-2-3 process is gone
 PASS  C · the boxed notice block is gone
 PASS  C · no registration affordance in the preview   → Emergency | Learn about Passport → | Back | Emergency | Back to your confirmation
@@ -161,4 +177,4 @@ PASS  C · clear type hierarchy title > lead   → 24px vs 15px
       preview visible text: REHEARSAL Happy Bistro is testing Happy Chair at this table. Anything you send reaches real staff. Allergies Emergency Allergy Information Sent Happy Chair received your allergy information for Happy 
 PASS  C · Back returns to the receipt
 
-ALL 27 CHECKS PASS
+ALL 31 CHECKS PASS

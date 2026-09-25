@@ -1847,10 +1847,11 @@ function App() {
                   You stay in control. Nothing is shared automatically.
                 </p>
 
-                {/* A state, not an action. There is no set-up affordance here because there is
-                    nothing to set up yet — which is also why nothing needs to say "nothing was
-                    saved": the screen never offers to save anything. */}
+                {/* A state, not an action — there is no set-up affordance here because there is
+                    nothing to set up yet. The line beneath it says so outright rather than
+                    leaving a guest to infer it from the absence of a button. One line, no box. */}
                 <div className="psp-soon">Coming soon</div>
+                <p className="psp-yet">Nothing is saved to Passport yet.</p>
 
                 <button className="sbtn" onClick={() => setPassportOpen(false)}>Back to your confirmation</button>
               </div>
