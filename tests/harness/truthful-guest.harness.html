@@ -1,0 +1,198 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/bundle.css"></head>
+<body><div id="root"></div><pre id="err" style="color:#f88;font:10px monospace"></pre>
+<script>
+// W1-4 Truthful guest harness. ALL network is mocked (tests/harness/supabase.mock.ts); the
+// runner also blocks every host but 127.0.0.1. One scenario per page load: ?s=<name>.
+window.onerror = m => { document.getElementById('err').textContent += 'ERROR: ' + m + '\n' }
+const P = new URLSearchParams(location.search)
+const S = P.get('s')
+const w = ms => new Promise(r => setTimeout(r, ms))
+const later = (ms, v) => new Promise(r => setTimeout(() => r(v), ms))
+const OK = d => ({ data: d, error: null })
+const resolveRow = [{ available: true, reason: null, table_label: 'P4', zone_name: 'Terrace', venue_name: 'Happy Bistro', service_mode: 'live' }]
+// The scripted server. Harness steps mutate SERVER to change what the RPC reports.
+const SERVER = { accepted_at: null, completed_at: null, createFails: false, createDelay: 600, noteOk: true, hasStateFn: true }
+window.__MOCK__ = {
+  rpc: {
+    resolve_service_point_code: () => OK(resolveRow),
+    guest_service_point_state: () => OK(resolveRow),
+    guest_venue_branding: () => OK([{ logo_url: null }]),
+    guest_create_request: a => later(SERVER.createDelay, SERVER.createFails
+      ? { data: null, error: { code: '500', message: 'mock failure' } }
+      : OK({ ok: true, request_id: 'req-' + a.p_category, service_mode: 'live' })),
+    guest_submit_sentiment: () => OK({ ok: true, sentiment_id: 'sent-1' }),
+    guest_add_sentiment_note: () => later(300, OK({ ok: SERVER.noteOk })),
+  },
+  table: {
+    assets: () => OK({ id: '11111111-1111-4111-8111-111111111111', venue_id: '22222222-2222-4222-8222-222222222222', label: 'T3', zone: 'Main Hall', service_point_type: 'table' }),
+    venues: () => OK({ id: '22222222-2222-4222-8222-222222222222', name: 'Happy Bistro' }),
+    requests: () => later(SERVER.createDelay, SERVER.createFails ? { data: null, error: { message: 'mock failure' } } : OK(null)),
+    sentiment_ratings: () => OK({ id: 'sent-legacy' }),
+  },
+}
+if (P.get('unavail') === '1') {
+  window.__MOCK__.rpc.resolve_service_point_code = () => OK([{ available: false, reason: 'zone_not_in_service' }])
+}
+if (P.get('nostate') !== '1') {
+  window.__MOCK__.rpc.guest_request_state = a => OK({ ok: true, requests: (a.p_request_ids || []).map(id => ({
+    id, status: SERVER.completed_at ? 'completed' : SERVER.accepted_at ? 'accepted' : 'pending',
+    accepted_at: SERVER.accepted_at, completed_at: SERVER.completed_at })) })
+}
+</script>
+<script src="/bundle.js"></script>
+<script>
+const T = []
+const ok = (n, c, x) => T.push((c ? 'PASS  ' : 'FAIL  ') + S + ' · ' + n + (x !== undefined && !c ? '  [' + x + ']' : ''))
+const q = s => document.querySelector(s), all = s => [...document.querySelectorAll(s)]
+const txt = () => document.body.innerText
+const f = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
+const svc = label => all('.sb').find(b => b.querySelector('.sb-l')?.textContent === label)
+const st = label => svc(label)?.querySelector('.sb-st')?.textContent.trim() || ''
+// Screen transitions animate in; wait them out so the capture shows the settled screen.
+const shot = async name => { if (/^1[2-7]/.test(name)) await w(900); return fetch('/__shot?name=' + encodeURIComponent(name)).catch(() => {}) }
+const calls = name => window.__CALLS__.filter(c => c.name === name)
+const until = async (cond, ms = 8000) => { const t = Date.now(); while (Date.now() - t < ms) { if (cond()) return true; await w(100) } return cond() }
+const hold = async (el, ms) => {
+  el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); await w(ms)
+  el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); await f()
+}
+const NO_CLAIM = /help is on the way|manager is on the way|server is coming|alerted instantly|accepted · on the way|leave a review/i
+
+const scenarios = {
+  // Service request, permanent-code path: Sending → Sent (stays Sent with no timestamp) →
+  // On the way only when accepted_at appears → Done only when completed_at appears.
+  async request() {
+    svc('Request Check').click(); await f()
+    ok('shows Sending… while the write is in flight', /^Sending/.test(st('Request Check')), st('Request Check'))
+    ok('no toast before the write confirms', !q('.toast'))
+    await shot('01-request-sending')
+    await until(() => /^Sent/.test(st('Request Check')))
+    ok('Sent after confirmed write', /^Sent · /.test(st('Request Check')), st('Request Check'))
+    ok('toast only after confirmation', /Request Check sent/.test(q('.toast')?.textContent || ''))
+    ok('request id kept and polled', await until(() => calls('guest_request_state').some(c => (c.args.p_request_ids || []).includes('req-check_please')), 2000))
+    await shot('02-request-sent')
+    await w(9000)   // longer than the old simulated accept (3-7 s) AND complete (8-15 s lower bound)
+    ok('still Sent after 9 s with no accepted_at (no simulated progress)', /^Sent · /.test(st('Request Check')), st('Request Check'))
+    ok('nothing claims acceptance', !NO_CLAIM.test(txt()))
+    SERVER.accepted_at = new Date().toISOString()
+    ok('On the way once accepted_at exists', await until(() => st('Request Check') === 'On the way', 7000), st('Request Check'))
+    await shot('03-request-on-the-way')
+    ok('a second tap does not create a second request', (svc('Request Check').click(), await w(300), calls('guest_create_request').length === 1))
+    SERVER.completed_at = new Date().toISOString()
+    ok('Done once completed_at exists', await until(() => st('Request Check') === 'Done', 7000), st('Request Check'))
+    const n = calls('guest_request_state').length; await w(6000)
+    ok('polling stops once nothing is open', calls('guest_request_state').length === n, calls('guest_request_state').length - n)
+    await shot('04-request-done')
+  },
+  async requestFail() {
+    SERVER.createFails = true
+    svc('Refill Water').click()
+    ok('failed write shown on that button', await until(() => /Not sent/.test(st('Refill Water'))), st('Refill Water'))
+    ok('no success toast on failure', !q('.toast'))
+    ok('no state poll for a failed write', calls('guest_request_state').length === 0)
+    await shot('05-request-failed')
+    SERVER.createFails = false
+    svc('Refill Water').click()
+    ok('tap retries after failure', await until(() => /^Sent/.test(st('Refill Water'))), st('Refill Water'))
+  },
+  async requestNoStateFn() {
+    svc('Get Server').click()
+    ok('RPC missing (PGRST202) → stays at a plain Sent', await until(() => st('Get Server') === 'Sent — your server will see it'), st('Get Server'))
+    const n = calls('guest_request_state').length; await w(6000)
+    ok('stops asking once the function is known missing', calls('guest_request_state').length === n)
+  },
+  async legacyRequest() {
+    svc('Clear Plates').click()
+    ok('legacy: Sent — your server will see it', await until(() => st('Clear Plates') === 'Sent — your server will see it'), st('Clear Plates'))
+    await w(6000)
+    ok('legacy: never polls, never advances', calls('guest_request_state').length === 0 && st('Clear Plates') === 'Sent — your server will see it')
+    await shot('06-legacy-request-sent')
+  },
+  async emergency() {
+    SERVER.createDelay = 1500
+    q('.ci').click(); await f()
+    ok('emergency screen copy claims nothing', !NO_CLAIM.test(txt()) && /sends an emergency request to staff/i.test(txt()))
+    await shot('07-emergency-idle')
+    const b = q('.hld')
+    b.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await w(1800)
+    ok('during the hold: only Keep holding…', /Keep holding/.test(txt()) && !/Alerting staff/i.test(txt()), txt().slice(0, 200))
+    await shot('08-emergency-holding')
+    await w(1500)
+    b.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); await f()
+    ok('after the hold, before the write: Sending…', /Sending/.test(txt()) && !/Sent to staff/i.test(txt()))
+    await shot('09-emergency-sending')
+    ok('Sent only after the write confirms', await until(() => /Sent to staff as an emergency request/.test(txt()), 4000))
+    ok('emergency request was written as critical', calls('guest_create_request').some(c => c.args.p_category === 'critical'))
+    await shot('10-emergency-sent')
+  },
+  async emergencyFail() {
+    SERVER.createFails = true; SERVER.createDelay = 300
+    q('.ci').click(); await f()
+    await hold(q('.hld'), 3300)
+    ok('failure says staff were not reached', await until(() => /Couldn.t reach staff/.test(txt()), 3000))
+    ok('failure claims nothing was sent', !/Sent to staff/.test(txt()))
+    await shot('11-emergency-failed')
+  },
+  async sentimentCode() {
+    all('.fx').find(b => /Disappointed/.test(b.textContent)).click()
+    await until(() => /We.re Sorry/.test(txt()))
+    ok('negative rating copy claims nothing', !NO_CLAIM.test(txt()), txt().slice(0, 300))
+    ok('says only that feedback reached the team', /your feedback is with the team/.test(txt()))
+    ok('note box present on code path', !!q('.ac-ta'))
+    await shot('12-sentiment-sad')
+    const ta = q('.ac-ta')
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, 'Cold food')
+    ta.dispatchEvent(new Event('input', { bubbles: true })); await f()
+    SERVER.noteOk = false
+    all('button').find(b => /Send Note/.test(b.textContent)).click()
+    ok('note write with ok:false is reported as a failure', await until(() => /Couldn.t send your note/.test(txt()), 3000))
+    ok('note went through guest_add_sentiment_note', calls('guest_add_sentiment_note').length === 1 && calls('sentiment_ratings.update').length === 0)
+    SERVER.noteOk = true
+    all('button').find(b => /Send Note/.test(b.textContent)).click()
+    ok('note confirmed only on ok:true', await until(() => /Note added to your feedback/.test(txt()), 3000))
+    ok('no fake acknowledgement timeline', !/Acknowledged|waiting…|Resolved/.test(txt()))
+    await shot('13-sentiment-note-added')
+    q('.close-x').click(); await f()
+    all('.fx').find(b => /Happy/.test(b.textContent)).click()
+    await until(() => /Glad You/.test(txt()))
+    ok('happy screen has no review button and no emoji', !/Leave a Review/.test(txt()) && !/[\u{1F300}-\u{1FAFF}⭐]/u.test(txt()))
+    await shot('14-sentiment-happy')
+  },
+  async sentimentLegacy() {
+    all('.fx').find(b => /Okay/.test(b.textContent)).click()
+    await until(() => /Thanks for Telling Us/.test(txt()))
+    ok('okay copy claims nothing', !NO_CLAIM.test(txt()), txt().slice(0, 300))
+    ok('legacy path hides the note box', !q('.ac-ta'))
+    await shot('15-sentiment-okay-legacy')
+  },
+  async a11y() {
+    ok('Urgent control is a <button> with aria-label', q('.ci')?.tagName === 'BUTTON' && !!q('.ci').getAttribute('aria-label'))
+    const r = q('.ci').getBoundingClientRect()
+    ok('Urgent control ≥44px', r.width >= 44 && r.height >= 44, `${r.width}x${r.height}`)
+    q('.ci').click(); await f()
+    ok('CloseX is a <button> with aria-label', q('.close-x')?.tagName === 'BUTTON' && q('.close-x').getAttribute('aria-label') === 'Close')
+    const c = q('.close-x').getBoundingClientRect()
+    ok('CloseX ≥44px', c.width >= 44 && c.height >= 44, `${c.width}x${c.height}`)
+    await shot('16-main')
+  },
+  async errorScreen() {
+    ok('error screen renders', await until(() => /isn.t available at this table/.test(txt()), 3000))
+    ok('error screen has no emoji', !/[\u{1F300}-\u{1FAFF}⚠]/u.test(txt()))
+    await shot('17-error-unavailable')
+  },
+}
+
+;(async () => {
+  try {
+    await w(3100)  // splash
+    await scenarios[S]()
+  } catch (e) { T.push('FAIL  ' + S + ' · threw ' + (e && e.stack || e)) }
+  const errs = document.getElementById('err').textContent
+  if (errs) T.push('FAIL  ' + S + ' · page error ' + errs.trim())
+  await fetch('/__results', { method: 'POST', body: T.join('\n') })
+})()
+</script>
+</body></html>

@@ -1,0 +1,46 @@
+PASS  request · shows Sending… while the write is in flight
+PASS  request · no toast before the write confirms
+PASS  request · Sent after confirmed write
+PASS  request · toast only after confirmation
+PASS  request · request id kept and polled
+PASS  request · still Sent after 9 s with no accepted_at (no simulated progress)
+PASS  request · nothing claims acceptance
+PASS  request · On the way once accepted_at exists
+PASS  request · a second tap does not create a second request
+PASS  request · Done once completed_at exists
+PASS  request · polling stops once nothing is open
+PASS  requestFail · failed write shown on that button
+PASS  requestFail · no success toast on failure
+PASS  requestFail · no state poll for a failed write
+PASS  requestFail · tap retries after failure
+PASS  requestNoStateFn · RPC missing (PGRST202) → stays at a plain Sent
+PASS  requestNoStateFn · stops asking once the function is known missing
+PASS  legacyRequest · legacy: Sent — your server will see it
+PASS  legacyRequest · legacy: never polls, never advances
+PASS  emergency · emergency screen copy claims nothing
+PASS  emergency · during the hold: only Keep holding…
+PASS  emergency · after the hold, before the write: Sending…
+PASS  emergency · Sent only after the write confirms
+PASS  emergency · emergency request was written as critical
+PASS  emergencyFail · failure says staff were not reached
+PASS  emergencyFail · failure claims nothing was sent
+PASS  sentimentCode · negative rating copy claims nothing
+PASS  sentimentCode · says only that feedback reached the team
+PASS  sentimentCode · note box present on code path
+PASS  sentimentCode · note write with ok:false is reported as a failure
+PASS  sentimentCode · note went through guest_add_sentiment_note
+PASS  sentimentCode · note confirmed only on ok:true
+PASS  sentimentCode · no fake acknowledgement timeline
+PASS  sentimentCode · happy screen has no review button and no emoji
+PASS  sentimentLegacy · okay copy claims nothing
+PASS  sentimentLegacy · legacy path hides the note box
+PASS  a11y · Urgent control is a <button> with aria-label
+PASS  a11y · Urgent control ≥44px
+PASS  a11y · CloseX is a <button> with aria-label
+PASS  a11y · CloseX ≥44px
+PASS  errorScreen · error screen renders
+PASS  errorScreen · error screen has no emoji
+PASS  index.html · viewport does not disable zoom
+
+43 passed, 0 failed
+screenshots: ../shots-tableside

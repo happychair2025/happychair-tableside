@@ -5,6 +5,15 @@ import type {
   Asset,
   SentimentScore,
 } from './types'
+import {
+  type GuestRequest,
+  type ServerRequestState,
+  requestStage,
+  requestStageLabel,
+  isOpen,
+  blocksNewTap,
+  applyServerState,
+} from './lib/requestStatus'
 
 // ══════════════════════════════════════════════════════════════
 // ALLERGEN DATABASE
@@ -158,19 +167,12 @@ const ShieldIcon = ({size=20,color='#f59e0b'}:{size?:number,color?:string}) => (
   </svg>
 );
 
-const ShieldCheck = ({size=28,color='#f59e0b'}:{size?:number,color?:string}) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-    <polyline points="9 12 11 14 15 10"/>
-  </svg>
-);
-
-const CloseX = ({onClick}:{onClick:()=>void}) => (
-  <div className="close-x" onClick={onClick}>
-    <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+const CloseX = ({onClick, label='Close'}:{onClick:()=>void, label?:string}) => (
+  <button type="button" className="close-x" onClick={onClick} aria-label={label}>
+    <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
     </svg>
-  </div>
+  </button>
 );
 
 const HandIcon = () => (
@@ -192,7 +194,7 @@ const SvcIcons: Record<string, JSX.Element> = {
 // ══════════════════════════════════════════════════════════════
 // APP
 // ══════════════════════════════════════════════════════════════
-type Screen = 'loading'|'error'|'main'|'happy'|'okay'|'sad'|'resolve'|'allergy'|'alwait'|'alack'|'urgent'|'success'
+type Screen = 'loading'|'error'|'main'|'happy'|'okay'|'sad'|'allergy'|'alwait'|'urgent'
 
 function App() {
   // ── CORE STATE ──
@@ -224,12 +226,20 @@ function App() {
   const [toast, setToast] = useState<string|null>(null)
 
   // ── SERVICE BUTTON STATE ──
-  const [btnStates, setBtnStates] = useState<Record<number,{status:string,at:number}>>({})
+  // One entry per service button. Only ever advanced by a confirmed write (phase) or by
+  // timestamps read back from the server (acceptedAt / completedAt) — see lib/requestStatus.
+  const [btnStates, setBtnStates] = useState<Record<number, GuestRequest>>({})
+  // Set once guest_request_state is found not to exist (client shipped before the RPC).
+  // Buttons then stay at "Sent", which is true, and polling stops.
+  const requestStateUnavailable = useRef(false)
 
   // ── SENTIMENT STATE ──
   const [okayNote, setOkayNote] = useState('')
   const [sadNote, setSadNote] = useState('')
-  const [feedbackSent, setFeedbackSent] = useState<{type:string,submitTime:Date,ackTime:Date|null,resolveTime:Date|null}|null>(null)
+  // True once the guest's note is confirmed written. Deliberately NOT a timeline: the
+  // sentiment row has no acknowledgement or resolution fields a guest can read, so nothing
+  // beyond "your note was added" can be shown truthfully.
+  const [noteSent, setNoteSent] = useState(false)
 
   // ── ALLERGY STATE ──
   const [decl, setDecl] = useState<Array<{name:string,risk:string,xc:boolean}>>([])
@@ -286,7 +296,11 @@ function App() {
 
   // ── URGENT STATE ──
   const [holdProgress, setHoldProgress] = useState(0)
+  // 0 idle · 1 holding · 2 still holding · 3 sending (hold complete, write in flight)
+  // · 4 sent (write confirmed) · 5 failed (write did not succeed).
+  // Nothing past 3 is reachable except through the result of the write.
   const [holdPhase, setHoldPhase] = useState(0)
+  const urgentInFlight = useRef(false)
   const holdRAF = useRef<number|null>(null)
 
   // ── SPLASH STATE ──
@@ -332,11 +346,13 @@ function App() {
   const go = (id: Screen) => {
     setScreen(id)
     setSubmitError('')
+    // Each visit to the emergency screen starts from the hold, never from a previous result.
+    if (id === 'urgent' && !urgentInFlight.current) { setHoldPhase(0); setHoldProgress(0) }
     // Reset sentiment session state on return to main so each new sentiment
     // attempt starts clean (no stale row id, no leftover note text).
     if (id === 'main') {
       setSentimentRowId(null)
-      setFeedbackSent(null)
+      setNoteSent(false)
       setOkayNote('')
       setSadNote('')
     }
@@ -584,30 +600,27 @@ function App() {
   // ══════════════════════════════════════════════════════════════
   // SUPABASE HANDLERS — PRESERVED EXACTLY
   // ══════════════════════════════════════════════════════════════
-  const sendRequest = async (category: string): Promise<boolean> => {
+  /**
+   * Writes one request. Returns whether the write was CONFIRMED and, on the code path, the
+   * server's request id — the guest's only handle for reading its progress back. Callers
+   * decide what to show; this function sets no guest-visible state.
+   */
+  const sendRequest = async (category: string): Promise<{ ok: boolean; requestId: string | null }> => {
     if (viaCode) {
       const { data, error } = await supabase.rpc('guest_create_request',
         { p_code: permanentCode, p_category: category, p_custom_type: null })
-      if (error || !(data as { ok?: boolean } | null)?.ok) {
-        setSubmitError('Failed to send request. Please try again.'); return false
-      }
-      return true
+      const r = data as { ok?: boolean; request_id?: string } | null
+      if (error || !r?.ok) return { ok: false, requestId: null }
+      return { ok: true, requestId: typeof r.request_id === 'string' ? r.request_id : null }
     }
-    if (!resolvedVenueId || !assetId) return false
+    if (!resolvedVenueId || !assetId) return { ok: false, requestId: null }
+    // Legacy entry: anon can insert but cannot read requests back, so no id is kept and no
+    // progress is ever claimed for it.
     const { error } = await supabase.from('requests').insert({
       venue_id: resolvedVenueId, asset_id: assetId, category, status: 'pending',
     })
-    if (error) { setSubmitError('Failed to send request. Please try again.'); return false }
-    return true
+    return { ok: !error, requestId: null }
   }
-
-  const handleRequestCheck = async () => { setSubmitError(''); await sendRequest('check_please') }
-
-  const handleRequestWater = async () => { setSubmitError(''); await sendRequest('water') }
-
-  const handleRequestServer = async () => { setSubmitError(''); await sendRequest('waiter') }
-
-  const handleRequestPlates = async () => { setSubmitError(''); await sendRequest('clear') }
 
   /**
    * ONE browser session at ONE table.
@@ -840,7 +853,7 @@ function App() {
     // capturing the new row id.
     setOkayNote('')
     setSadNote('')
-    setFeedbackSent(null)
+    setNoteSent(false)
     setSentimentRowId(data.id)
     setSubmitting(false)
     go(score === 3 ? 'happy' : score === 2 ? 'okay' : 'sad')
@@ -851,7 +864,7 @@ function App() {
   // submitting flag is needed here.
   const handleUrgentSubmit = async (): Promise<boolean> => {
     if (!viaCode && (!resolvedVenueId || !assetId)) return false
-    const ok = await sendRequest('critical')
+    const { ok } = await sendRequest('critical')
     const error = ok ? null : new Error('request_failed')
     if (error) {
       console.error('[tableside] urgent submit failed:', error)
@@ -864,30 +877,84 @@ function App() {
   // ══════════════════════════════════════════════════════════════
   // SERVICE BUTTON TAP + UBER STATES
   // ══════════════════════════════════════════════════════════════
-  const svcHandlers = [handleRequestCheck, handleRequestWater, handleRequestServer, handleRequestPlates]
+  const svcCategories = ['check_please', 'water', 'waiter', 'clear']
   const svcLabels = ['Request Check', 'Refill Water', 'Get Server', 'Clear Plates']
   const svcIcons = ['ck', 'wa', 'be', 'cl']
 
+  /**
+   * A service button tap. The button says "Sending…" while the write is in flight, and only
+   * a CONFIRMED write moves it to "Sent" and shows the toast. A failed write says so on the
+   * button itself and a second tap retries. Nothing advances on a timer: "On the way" and
+   * "Done" appear only when the server reports accepted_at / completed_at (see the poll
+   * below). The simulated accept/complete timers that used to live here are gone.
+   */
   const handleSvcTap = async (idx: number) => {
-    if (btnStates[idx]) return
-    setBtnStates(p => ({...p, [idx]: {status:'pending', at:Date.now()}}))
-    await svcHandlers[idx]()
-    showToast(`${svcLabels[idx]} requested`)
-    // Simulate accept (3-7s)
-    setTimeout(() => {
-      setBtnStates(p => ({...p, [idx]: {status:'accepted', at:p[idx]?.at || Date.now()}}))
-    }, 3000 + Math.random() * 4000)
-    // Simulate complete (8-15s)
-    setTimeout(() => {
-      setBtnStates(p => { const n = {...p}; delete n[idx]; return n })
-    }, 8000 + Math.random() * 7000)
+    if (blocksNewTap(btnStates[idx])) return
+    setBtnStates(p => ({...p, [idx]: {
+      phase: 'sending', requestId: null, tracked: false, acceptedAt: null, completedAt: null, at: Date.now(),
+    }}))
+    const { ok, requestId } = await sendRequest(svcCategories[idx])
+    setBtnStates(p => ({...p, [idx]: {
+      ...p[idx],
+      phase: ok ? 'sent' : 'failed',
+      requestId,
+      // Progress is readable only on the code path, with an id, and while the RPC exists.
+      tracked: ok && viaCode && !!requestId && !requestStateUnavailable.current,
+    }}))
+    if (ok) showToast(`${svcLabels[idx]} sent`)
   }
 
+  // ── REQUEST PROGRESS POLL ──
+  // Same shape as the venue-review poll: an immediate read, then every 5 s, and again when
+  // the page comes back to the foreground. Runs only while some request is still open and
+  // stops by itself once every request is Done. Read-only: guest_request_state writes
+  // nothing, so it cannot duplicate a request. A failed read changes nothing on screen.
+  const openRequestIds = Object.values(btnStates).filter(isOpen).map(r => r.requestId as string)
+  const openKey = openRequestIds.slice().sort().join(',')
+  useEffect(() => {
+    if (!viaCode || !openKey || requestStateUnavailable.current) return
+    const ids = openKey.split(',')
+    let cancelled = false
+    const check = async () => {
+      if (requestStateUnavailable.current) return
+      const { data, error } = await supabase.rpc('guest_request_state',
+        { p_code: permanentCode, p_request_ids: ids })
+      if (cancelled) return
+      if (error) {
+        // The client can ship before the function exists. PGRST202 = function not found;
+        // stop asking, and leave every button at "Sent", which remains true.
+        if ((error as { code?: string }).code === 'PGRST202') {
+          requestStateUnavailable.current = true
+          setBtnStates(p => {
+            const n = { ...p }
+            for (const k of Object.keys(n)) n[Number(k)] = { ...n[Number(k)], tracked: false }
+            return n
+          })
+        }
+        return
+      }
+      const v = data as { ok?: boolean; requests?: ServerRequestState[] } | null
+      if (!v?.ok || !Array.isArray(v.requests)) return
+      setBtnStates(p => applyServerState(p, v.requests as ServerRequestState[]))
+    }
+    void check()
+    const t = setInterval(check, 5000)
+    const onVisible = () => { if (document.visibilityState === 'visible') void check() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      cancelled = true
+      clearInterval(t)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [openKey, viaCode, permanentCode])
+
   // ── BUTTON TIMER ──
+  // Re-renders the elapsed counter once a second while a request is waiting. It changes the
+  // NUMBER of seconds shown, never the status.
   const [, setTick] = useState(0)
   useEffect(() => {
-    const hasPending = Object.values(btnStates).some(b => b.status === 'pending')
-    if (!hasPending) return
+    const waiting = Object.values(btnStates).some(b => { const s = requestStage(b); return s === 'sent' || s === 'sending' })
+    if (!waiting) return
     const iv = setInterval(() => setTick(t => t+1), 1000)
     return () => clearInterval(iv)
   }, [btnStates])
@@ -900,33 +967,33 @@ function App() {
   // ══════════════════════════════════════════════════════════════
   // SENTIMENT FEEDBACK
   // ══════════════════════════════════════════════════════════════
-  // Persists the note to the existing sentiment_ratings row created at sentiment
-  // tap. The previous version simulated ack/resolve via setTimeout and never
-  // wrote to Supabase — the textarea content was silently discarded. Real
-  // ack/resolve signals don't exist on this table; the timeline below honestly
-  // displays "waiting…" / "—" for those states.
+  // Attaches the guest's note to the sentiment row created at the tap, through the
+  // server function that scopes the write to this table's code (contract C8: ratings and
+  // notes are written only through server functions). `ok` is checked, not just `error`:
+  // the function reports ok:false when no row matched, and that is a failure to the guest.
+  //
+  // Only the code path can do this. The legacy path used an anon direct UPDATE that RLS
+  // matched to zero rows — PostgREST returns success for that, so the guest was told the
+  // note was sent while it was silently discarded. The note box is not shown there at all.
+  const canAddNote = viaCode
   const sendFeedback = async (type: 'okay'|'sad') => {
-    if (!sentimentRowId || notesSubmitting) return
+    if (!canAddNote || !sentimentRowId || notesSubmitting) return
     const noteText = (type === 'okay' ? okayNote : sadNote).trim()
     if (!noteText) return
     setNotesSubmitting(true)
     setSubmitError('')
-    const { error } = await supabase
-      .from('sentiment_ratings')
-      .update({ notes: noteText })
-      .eq('id', sentimentRowId)
-    if (error) {
-      console.error('[tableside] notes update failed:', error)
-      setSubmitError("Couldn't send your message — try again.")
+    const { data, error } = await supabase.rpc('guest_add_sentiment_note',
+      { p_code: permanentCode, p_sentiment_id: sentimentRowId, p_notes: noteText })
+    if (error || !(data as { ok?: boolean } | null)?.ok) {
+      console.error('[tableside] note write failed:', error ?? data)
+      setSubmitError("Couldn't send your note. Please try again.")
       setNotesSubmitting(false)
       // Textarea text intentionally preserved so the guest can retry without retyping.
       return
     }
     setNotesSubmitting(false)
-    setFeedbackSent({ type, submitTime: new Date(), ackTime: null, resolveTime: null })
+    setNoteSent(true)
   }
-
-  const fmtClock = (d: Date) => d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})
 
   // ══════════════════════════════════════════════════════════════
   // ALLERGY HELPERS
@@ -1171,24 +1238,34 @@ function App() {
   // ══════════════════════════════════════════════════════════════
   // URGENT HOLD
   // ══════════════════════════════════════════════════════════════
+  /**
+   * Press-and-hold for emergency help.
+   *
+   * The hold itself only ever says "Keep holding…". Completing it moves to "Sending…", and
+   * only the RESULT of the write may move past that: "Sent to staff" on a confirmed insert,
+   * a plain failure line otherwise. Previously the button read "Alerting staff…" at 50% of
+   * the hold — before anything had been written — and "Help Is On the Way" the moment the
+   * hold completed, whether or not the request ever landed.
+   */
   const startHold = () => {
+    if (urgentInFlight.current) return
     const start = Date.now()
     setHoldPhase(0)
     const tick = () => {
       const p = Math.min((Date.now() - start) / 3000, 1)
       setHoldProgress(p)
-      if (p >= 0.5 && holdPhase < 2) setHoldPhase(2)
-      else if (p >= 0.15 && holdPhase < 1) setHoldPhase(1)
+      if (p >= 0.5) setHoldPhase(2)
+      else if (p >= 0.15) setHoldPhase(1)
       if (p >= 1) {
+        urgentInFlight.current = true
         setHoldPhase(3)
-        // Gate the success toast on the actual insert succeeding — without this
-        // the guest sees "Help is on the way" even when the row never lands.
         handleUrgentSubmit().then(ok => {
-          setTimeout(() => {
-            go('main')
-            if (ok) showToast('Help is on the way — staff alerted')
-            // On failure submitError is already set; it renders on the main screen.
-          }, 1200)
+          urgentInFlight.current = false
+          setHoldPhase(ok ? 4 : 5)
+          if (!ok) setHoldProgress(0)
+          if (ok) showToast('Emergency request sent to staff')
+          // On failure submitError is set and the guest stays here, told to wave for help;
+          // nothing claims anyone was reached.
         })
         return
       }
@@ -1199,7 +1276,10 @@ function App() {
 
   const endHold = () => {
     if (holdRAF.current) cancelAnimationFrame(holdRAF.current)
-    setHoldProgress(0); setHoldPhase(0)
+    // Lifting the finger after the hold completed must not wipe the result off the screen.
+    if (urgentInFlight.current) return
+    setHoldPhase(ph => (ph >= 4 ? ph : 0))
+    setHoldProgress(pr => (pr >= 1 ? pr : 0))
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -1224,7 +1304,12 @@ function App() {
     const m = msgs[appError] || msgs.invalid_qr
     return (
       <div className="card" style={{textAlign:'center',padding:'40px 24px'}}>
-        <div style={{fontSize:'32px',marginBottom:'12px'}}>⚠️</div>
+        <div style={{marginBottom:'12px',display:'flex',justifyContent:'center'}} aria-hidden="true">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
         <div className="ot">{m.title}</div>
         <div className="os">{m.body}</div>
       </div>
@@ -1287,9 +1372,9 @@ function App() {
           <div className="card" style={{position:'relative'}}>
             {/* Emergency icon */}
             <div className="ci-wrap">
-              <div className="ci" onClick={() => go('urgent')} title="Urgent Help" style={{background:'rgba(239,68,68,.06)',borderColor:'rgba(239,68,68,.35)'}}>
-                <div className="hand"><HandIcon/></div>
-              </div>
+              <button type="button" className="ci" onClick={() => go('urgent')} title="Urgent Help" aria-label="Urgent help" style={{background:'rgba(239,68,68,.06)',borderColor:'rgba(239,68,68,.35)'}}>
+                <span className="hand" aria-hidden="true"><HandIcon/></span>
+              </button>
             </div>
 
             {/* Venue header */}
@@ -1317,14 +1402,22 @@ function App() {
             <div className="bg">
               {svcLabels.map((label, i) => {
                 const bs = btnStates[i]
-                const cls = bs?.status === 'pending' ? 'sb pending' : bs?.status === 'accepted' ? 'sb accepted' : 'sb'
+                const stage = bs ? requestStage(bs) : null
+                const cls = stage === 'sending' || stage === 'sent' || stage === 'sent_untracked' ? 'sb pending'
+                  : stage === 'on_the_way' || stage === 'done' ? 'sb accepted'
+                  : stage === 'failed' ? 'sb failed' : 'sb'
+                const text = stage ? requestStageLabel(stage) : ''
                 return (
-                  <button key={i} className={cls} onClick={() => handleSvcTap(i)}>
-                    <div>{SvcIcons[svcIcons[i]]}</div>
+                  <button key={i} className={cls} onClick={() => handleSvcTap(i)}
+                    aria-label={stage ? `${label}: ${text}` : label}>
+                    <div aria-hidden="true">{SvcIcons[svcIcons[i]]}</div>
                     <span className="sb-l">{label}</span>
-                    <div className="sb-st">
-                      {bs?.status === 'pending' && <><div className="spinner"/>{`Requested · ${fmtTime(bs.at)}`}</>}
-                      {bs?.status === 'accepted' && <><div className="ck"><svg width="7" height="7" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="10 3 5 9 2 6"/></svg></div>Accepted · On the Way</>}
+                    <div className="sb-st" role="status">
+                      {stage === 'sending' && <><div className="spinner"/>{text}</>}
+                      {stage === 'sent' && bs && <>{`${text} · ${fmtTime(bs.at)}`}</>}
+                      {stage === 'sent_untracked' && <>{text}</>}
+                      {(stage === 'on_the_way' || stage === 'done') && <><div className="ck"><svg width="7" height="7" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="10 3 5 9 2 6"/></svg></div>{text}</>}
+                      {stage === 'failed' && <>{text}</>}
                     </div>
                   </button>
                 )
@@ -1352,114 +1445,58 @@ function App() {
           </div>
         )}
 
-        {/* ══ HAPPY ══ */}
-        {screen === 'happy' && (
-          <div className="sc on" style={{position:'relative'}}>
-            <CloseX onClick={() => go('main')}/>
-            <div className="ob">
-              <div className="of" style={{filter:'drop-shadow(0 0 24px rgba(16,185,129,.35))'}}><Face type="ok" size={56}/></div>
-              <div className="ot" style={{color:'var(--ok)'}}>Glad You're Enjoying It</div>
-              <div className="os">A quick review helps other guests and supports our team.</div>
-              <div className="ac" style={{textAlign:'center'}}>
-                <button className="ac-btn" style={{background:'var(--ok)',color:'var(--bg)',padding:'14px',width:'100%',border:'none',borderRadius:'10px',fontSize:'14px',fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'6px'}}>
-                  ⭐⭐⭐⭐⭐ Leave a Review
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══ OKAY ══ */}
-        {screen === 'okay' && (
-          <div className="sc on" style={{position:'relative'}}>
-            <CloseX onClick={() => go('main')}/>
-            <div className="ob">
-              <div className="of" style={{filter:'drop-shadow(0 0 24px rgba(245,158,11,.35))'}}><Face type="warn" size={56}/></div>
-              <div className="ot" style={{color:'#f59e0b'}}>We Can Make This Better</div>
-              <div className="os">A server is coming by to help.</div>
-              {!feedbackSent ? (
-                <div className="ac" style={{borderColor:'rgba(245,158,11,.25)'}}>
-                  <div className="ac-t">What Can We Fix Right Now?</div>
-                  <div className="ac-s">Share a quick note so we can help faster.</div>
-                  <textarea className="ac-ta" value={okayNote} onChange={e=>setOkayNote(e.target.value)} placeholder="What can we improve?"/>
-                  <button className="ac-btn" style={{background:'#f59e0b',color:'var(--bg)',width:'100%',border:'none',borderRadius:'10px',padding:'13px',fontSize:'14px',fontWeight:700,cursor:notesSubmitting||!okayNote.trim()?'not-allowed':'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',opacity:notesSubmitting||!okayNote.trim()?.6:1}} disabled={notesSubmitting||!okayNote.trim()} onClick={() => sendFeedback('okay')}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    {notesSubmitting ? 'Sending…' : 'Send to Server'}
-                  </button>
-                </div>
-              ) : (
-                <div className="ac" style={{borderColor:'rgba(245,158,11,.25)'}}>
-                  <div style={{textAlign:'center',marginBottom:'12px'}}>
-                    <div style={{width:'40px',height:'40px',borderRadius:'50%',background:'rgba(245,158,11,.08)',border:'2px solid #f59e0b',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px'}}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        {/* ══ SENTIMENT RESULT ══
+            One component for all three answers. Every line here states only what the write
+            established: the rating is with the team. It used to promise "A server is coming
+            by" (2) and "A manager is on the way now" (1) — nothing dispatches anyone from a
+            rating, and no guest-readable state exists that could show it. It also offered a
+            "Leave a Review" button with no action. Progress is shown only once real
+            ownership/resolution timestamps are exposed to the guest (contract C8). */}
+        {(screen === 'happy' || screen === 'okay' || screen === 'sad') && (() => {
+          const kind = screen
+          const face = kind === 'happy' ? 'ok' : kind === 'okay' ? 'warn' : 'danger'
+          const tone = kind === 'happy' ? 'var(--ok)' : kind === 'okay' ? '#f59e0b' : 'var(--danger)'
+          const glow = kind === 'happy' ? 'rgba(16,185,129,.35)' : kind === 'okay' ? 'rgba(245,158,11,.35)' : 'rgba(239,68,68,.35)'
+          const title = kind === 'happy' ? "Glad You're Enjoying It" : kind === 'okay' ? 'Thanks for Telling Us' : "We're Sorry"
+          const note = kind === 'okay' ? okayNote : sadNote
+          const setNote = kind === 'okay' ? setOkayNote : setSadNote
+          return (
+            <div className="sc on" style={{position:'relative'}}>
+              <CloseX onClick={() => go('main')}/>
+              <div className="ob">
+                <div className="of" style={{filter:`drop-shadow(0 0 24px ${glow})`}}><Face type={face} size={56}/></div>
+                <div className="ot" style={{color:tone}}>{title}</div>
+                <div className="os">Thanks — your feedback is with the team.</div>
+                {kind !== 'happy' && (
+                  <div className="os" style={{marginTop:'6px'}}>If you need something now, please ask any member of staff.</div>
+                )}
+                {kind !== 'happy' && canAddNote && (!noteSent ? (
+                  <div className="ac" style={{borderColor: kind === 'okay' ? 'rgba(245,158,11,.25)' : 'rgba(239,68,68,.25)'}}>
+                    <div className="ac-t">Want to Tell Us More?</div>
+                    <div className="ac-s">Add a note to your feedback.</div>
+                    <textarea className="ac-ta" aria-label="Your note" value={note} onChange={e=>setNote(e.target.value)}
+                      placeholder={kind === 'okay' ? 'What could be better?' : 'What went wrong?'}/>
+                    {submitError && <div role="alert" style={{color:'#fca5a5',fontSize:'13px',margin:'0 0 10px',textAlign:'center'}}>{submitError}</div>}
+                    <button className="ac-btn" style={{background:tone,color: kind === 'okay' ? 'var(--bg)' : '#fff',width:'100%',border:'none',borderRadius:'10px',padding:'13px',minHeight:'44px',fontSize:'14px',fontWeight:700,cursor:notesSubmitting||!note.trim()?'not-allowed':'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',opacity:notesSubmitting||!note.trim()?.6:1}}
+                      disabled={notesSubmitting||!note.trim()} onClick={() => sendFeedback(kind)}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                      {notesSubmitting ? 'Sending…' : 'Send Note'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="ac" style={{borderColor: kind === 'okay' ? 'rgba(245,158,11,.25)' : 'rgba(239,68,68,.25)',textAlign:'center'}}>
+                    <div style={{width:'40px',height:'40px',borderRadius:'50%',border:`2px solid ${tone}`,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px'}}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={tone} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
                     </div>
-                    <div style={{color:'#f59e0b',fontSize:'16px',fontWeight:700}}>Sent to Your Server</div>
+                    {/* Exactly what the write established — no acknowledgement or resolution
+                        timeline, because the guest has no way to read either. */}
+                    <div style={{color:tone,fontSize:'16px',fontWeight:700}}>Note added to your feedback</div>
                   </div>
-                  <div className="tst">
-                    <div className="tsr"><div className={`td done`}/><div className="tl">Submitted</div><div className="tt done">{fmtClock(feedbackSent.submitTime)}</div></div>
-                    <div className="tsr"><div className={`td ${feedbackSent.ackTime ? 'done' : 'prog'}`}/><div className="tl">Server Acknowledged</div><div className={`tt ${feedbackSent.ackTime ? 'done' : 'prog'}`}>{feedbackSent.ackTime ? fmtClock(feedbackSent.ackTime) : 'waiting…'}</div></div>
-                    <div className="tsr"><div className={`td ${feedbackSent.resolveTime ? 'done' : feedbackSent.ackTime ? 'prog' : 'wait'}`}/><div className="tl">Resolved</div><div className={`tt ${feedbackSent.resolveTime ? 'done' : feedbackSent.ackTime ? 'prog' : 'wait'}`}>{feedbackSent.resolveTime ? fmtClock(feedbackSent.resolveTime) : feedbackSent.ackTime ? 'in progress…' : '—'}</div></div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ══ SAD ══ */}
-        {screen === 'sad' && (
-          <div className="sc on" style={{position:'relative'}}>
-            <CloseX onClick={() => go('main')}/>
-            <div className="ob">
-              <div className="of" style={{filter:'drop-shadow(0 0 24px rgba(239,68,68,.35))'}}><Face type="danger" size={56}/></div>
-              <div className="ot" style={{color:'var(--danger)'}}>We're Sorry. Let's Make This Right.</div>
-              <div className="os">A manager is on the way now.</div>
-              {!feedbackSent ? (
-                <div className="ac" style={{borderColor:'rgba(239,68,68,.25)'}}>
-                  <div className="ac-t">Tell Us What Happened</div>
-                  <div className="ac-s">This helps us resolve it quickly.</div>
-                  <textarea className="ac-ta" value={sadNote} onChange={e=>setSadNote(e.target.value)} placeholder="What went wrong?"/>
-                  <button className="ac-btn" style={{background:'var(--danger)',color:'#fff',width:'100%',border:'none',borderRadius:'10px',padding:'13px',fontSize:'14px',fontWeight:700,cursor:notesSubmitting||!sadNote.trim()?'not-allowed':'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',opacity:notesSubmitting||!sadNote.trim()?.6:1}} disabled={notesSubmitting||!sadNote.trim()} onClick={() => sendFeedback('sad')}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    {notesSubmitting ? 'Sending…' : 'Send to Manager'}
-                  </button>
-                </div>
-              ) : (
-                <div className="ac" style={{borderColor:'rgba(239,68,68,.25)'}}>
-                  <div style={{textAlign:'center',marginBottom:'12px'}}>
-                    <div style={{width:'40px',height:'40px',borderRadius:'50%',background:'rgba(239,68,68,.08)',border:'2px solid var(--danger)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 8px'}}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
-                    <div style={{color:'var(--danger)',fontSize:'16px',fontWeight:700}}>Sent to Manager</div>
-                  </div>
-                  <div className="tst">
-                    <div className="tsr"><div className="td done"/><div className="tl">Submitted</div><div className="tt done">{fmtClock(feedbackSent.submitTime)}</div></div>
-                    <div className="tsr"><div className={`td ${feedbackSent.ackTime ? 'done' : 'prog'}`}/><div className="tl">Manager Acknowledged</div><div className={`tt ${feedbackSent.ackTime ? 'done' : 'prog'}`}>{feedbackSent.ackTime ? fmtClock(feedbackSent.ackTime) : 'waiting…'}</div></div>
-                    <div className="tsr"><div className={`td ${feedbackSent.resolveTime ? 'done' : feedbackSent.ackTime ? 'prog' : 'wait'}`}/><div className="tl">Resolved</div><div className={`tt ${feedbackSent.resolveTime ? 'done' : feedbackSent.ackTime ? 'prog' : 'wait'}`}>{feedbackSent.resolveTime ? fmtClock(feedbackSent.resolveTime) : feedbackSent.ackTime ? 'in progress…' : '—'}</div></div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ══ RESOLVED ══ */}
-        {screen === 'resolve' && (
-          <div className="sc on" style={{position:'relative'}}>
-            <CloseX onClick={() => go('main')}/>
-            <div className="ob">
-              <div className="of" style={{filter:'drop-shadow(0 0 24px rgba(34,211,238,.3))'}}>
-                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-              </div>
-              <div className="ot">Did We Make It Right?</div>
-              <div className="os">We hope your experience improved.</div>
-              <div className="rbtns">
-                <button style={{background:'var(--cyan)',color:'var(--bg)',border:'none'}} onClick={() => go('happy')}>Yes, All Good</button>
-                <button style={{background:'transparent',color:'var(--t1)',border:'1px solid var(--b)'}} onClick={() => go('main')}>Not Yet</button>
+                ))}
               </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* ══ ALLERGY — GUIDED FLOW ══ */}
         {screen === 'allergy' && (
@@ -1831,8 +1868,8 @@ function App() {
                 Back
               </button>
               <span className="sc-head-title">Passport</span>
-              {/* Now reachable from either post-submit state, so return to whichever it was. */}
-              <EmergencyButton onOpen={() => { setPassportOpen(false); openUrgent(screen === 'alack' ? 'alack' : 'alwait') }}/>
+              {/* Reachable only from the receipt, so that is where the emergency screen returns. */}
+              <EmergencyButton onOpen={() => { setPassportOpen(false); openUrgent('alwait') }}/>
             </div>
             <div className="scr">
               <div className="stp">
@@ -1859,28 +1896,6 @@ function App() {
           </div>
         )}
 
-        {/* ══ PROFILE ══ */}
-        {screen === 'alack' && (
-          <div className="sc on" style={{position:'relative'}}>
-            <div className="sc-head sc-head--bare">
-              <span className="sc-head-title">Allergies</span>
-              <EmergencyButton onOpen={() => openUrgent('alack')}/>
-            </div>
-            <CloseX onClick={() => go('main')}/>
-            <div className="ob">
-              <div style={{width:'68px',height:'68px',background:'rgba(245,158,11,.08)',border:'2px solid #f59e0b',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'18px',boxShadow:'0 0 30px rgba(245,158,11,.2)'}}>
-                <ShieldCheck/>
-              </div>
-              <div className="ot" style={{color:'#f59e0b'}}>You're All Set</div>
-              <div className="os">Your server and kitchen have been notified.</div>
-              {/* Was a boxed pitch with its own wording and a "Create Free Profile" button that
-                  had no handler at all — a primary-styled control promising account creation
-                  and doing nothing. Replaced by the same quiet card the receipt uses. */}
-              <PassportCard onOpen={() => setPassportOpen(true)}/>
-            </div>
-          </div>
-        )}
-
         {/* ══ URGENT ══ */}
         {screen === 'urgent' && (
           <div className="sc on" style={{position:'relative'}}>
@@ -1888,7 +1903,7 @@ function App() {
             <div className="ob">
               <div className="alert-icon"><HandIcon/></div>
               <div className="ot" style={{color:'var(--danger)'}}>Need Help Right Now?</div>
-              <div className="os">This will alert staff right away.</div>
+              <div className="os">Holding the button sends an emergency request to staff.</div>
               <div style={{maxWidth:'320px',width:'100%',margin:'24px auto 0'}}>
                 <div style={{position:'relative',marginBottom:'8px'}}>
                   <button className="hld" style={{background:'var(--danger)',color:'#fff'}}
@@ -1896,13 +1911,23 @@ function App() {
                     onTouchStart={startHold} onTouchEnd={endHold} onTouchCancel={endHold}>
                     <div className="hld-fill" style={{width:`${holdProgress*100}%`}}/>
                     <span style={{position:'relative',zIndex:1}}>
-                      {holdPhase >= 3 ? 'Help Is On the Way' : holdPhase >= 2 ? 'Alerting staff…' : holdPhase >= 1 ? 'Keep holding…' : 'Press and Hold for Immediate Help'}
+                      {holdPhase === 5 ? 'Not sent. Hold to try again.'
+                        : holdPhase === 4 ? 'Sent to Staff'
+                        : holdPhase === 3 ? 'Sending…'
+                        : holdPhase >= 1 ? 'Keep holding…'
+                        : 'Press and Hold for Immediate Help'}
                     </span>
                   </button>
                   <div className="hld-progress"><div className="hld-bar" style={{width:`${holdProgress*100}%`}}/></div>
                 </div>
-                <div style={{color: holdPhase >= 2 ? 'var(--danger)' : holdPhase >= 1 ? 'var(--t1)' : 'var(--t2)', fontSize:'14px',textAlign:'center',fontWeight:500,minHeight:'20px',transition:'color .2s'}}>
-                  {holdPhase >= 3 ? 'Help Is On the Way' : holdPhase >= 2 ? 'Alerting staff…' : holdPhase >= 1 ? 'Keep holding…' : 'Manager and nearest staff alerted instantly.'}
+                {/* Says only what is true at each moment: nothing about who is alerted, and
+                    nothing past "Sending…" until the write has answered. */}
+                <div role="status" style={{color: holdPhase === 5 ? 'var(--danger)' : holdPhase >= 1 ? 'var(--t1)' : 'var(--t2)', fontSize:'14px',textAlign:'center',fontWeight:500,minHeight:'20px',transition:'color .2s'}}>
+                  {holdPhase === 5 ? "Couldn't reach staff. Please wave for help."
+                    : holdPhase === 4 ? 'Sent to staff as an emergency request.'
+                    : holdPhase === 3 ? 'Sending your emergency request…'
+                    : holdPhase >= 1 ? 'Keep holding…'
+                    : 'Hold for 3 seconds.'}
                 </div>
               </div>
             </div>
