@@ -1,4 +1,8 @@
 // Static guard against simulated progress (contracts C6 / C12: "a status appears only after
+// KNOWN GAPS (verified by mutation, Oct 2026): a decoy network call before a sink inside the same
+// timer (e.g. `void supabase.rpc('noop'); setBtnStates(...)`) passes, and a timeout helper that
+// resolves SUCCESS passes. Both are caught by the runtime harness (tests/harness), which is the
+// authoritative guard; this static scan is a fast first line.
 // the write confirms it", "no simulated progress"). Run: node tests/no-simulated-progress.test.mjs
 //
 // WHAT IT GUARANTEES — within each file under src/, a violation is reported when time alone
@@ -111,11 +115,20 @@ function expand(text, defs, depth = 0, seen = new Set()) {
   return out
 }
 
+function stripCommentsAndStrings(code) {
+  return code
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ')
+    .replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, '""')
+}
+
 // A sink that is not preceded, in the timed code, by a network read.
 function unguardedSink(text) {
   const s = SINK.exec(text)
   if (!s) return null
-  return NETWORK.test(text.slice(0, s.index)) ? null : s[0].replace(/\s*\($/, '').trim()
+  // Comments and string literals cannot vouch for a network read: strip them first, so a
+  // comment mentioning "supabase" before a sink does not exempt it.
+  return NETWORK.test(stripCommentsAndStrings(text.slice(0, s.index))) ? null : s[0].replace(/\s*\($/, '').trim()
 }
 
 const DELAY_INLINE = /new\s+Promise\s*(?:<[^>]*>)?\s*\(\s*\(?\s*([A-Za-z_$][\w$]*)[^)]*?\)?\s*=>\s*\{?\s*(?:[\w$.]+\s*=\s*)?setTimeout\s*\(\s*\1\b/
@@ -187,6 +200,8 @@ const MUST_FLAG = {
   'await inline delay then setter': `async function fake() { await new Promise(resolve => setTimeout(resolve, 3000)); setHoldPhase(4) }`,
   'delay .then setter': `const wait = (ms) => new Promise(r => setTimeout(r, ms))\nwait(3000).then(() => setNoteSent(true))`,
   'inline delay .then go()': `new Promise(r => setTimeout(r, 2000)).then(() => go('success'))`,
+  'comment mentioning supabase cannot vouch': `setTimeout(() => { /* supabase */ setBtnStates(p => ({...p, 0: {status:'accepted'}})) }, 4000)`,
+  'string mentioning fetch( cannot vouch': `setTimeout(() => { const s = 'fetch(x)'; setBtnStates(p => p) }, 4000)`,
 }
 const MUST_PASS = {
   'server poll (named)': `const check = async () => { const { data } = await supabase.rpc('guest_request_state', {}); setBtnStates(p => applyServerState(p, data)) }\nconst t = setInterval(check, 5000)`,

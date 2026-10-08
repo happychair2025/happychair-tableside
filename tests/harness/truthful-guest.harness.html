@@ -193,7 +193,7 @@ const scenarios = {
     q('.ci').click(); await f()
     await hold(q('.hld'), 3300)
     ok('silent server: Sending…', /Sending your emergency request/.test(txt()))
-    ok('after the 10 s bound: honest failure', await until(() => /Couldn.t reach staff\. Please wave for help\./.test(txt()), 12000))
+    ok('after the 10 s bound: honest failure', await until(() => /Couldn.t confirm it reached staff\. Please wave for help\./.test(txt()), 12000))
     ok('no claim it was sent', !/Sent to staff/.test(txt()))
     await shot('11b-emergency-timeout')
     SERVER.createDelay = 300
@@ -204,7 +204,7 @@ const scenarios = {
     SERVER.createFails = true; SERVER.createDelay = 300
     q('.ci').click(); await f()
     await hold(q('.hld'), 3300)
-    ok('failure says staff were not reached', await until(() => /Couldn.t reach staff/.test(txt()), 3000))
+    ok('failure says delivery is unconfirmed', await until(() => /Couldn.t confirm it reached staff/.test(txt()), 3000))
     ok('failure claims nothing was sent', !/Sent to staff/.test(txt()))
     await shot('11-emergency-failed')
   },

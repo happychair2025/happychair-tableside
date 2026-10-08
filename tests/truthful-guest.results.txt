@@ -44,7 +44,7 @@ PASS  emergency · explicit Send again control is offered
 PASS  emergency · Send again returns to the hold, sends nothing by itself
 PASS  emergency · a second deliberate hold sends a second request
 PASS  emergency · leaving and returning starts from the hold
-PASS  emergencyFail · failure says staff were not reached
+PASS  emergencyFail · failure says delivery is unconfirmed
 PASS  emergencyFail · failure claims nothing was sent
 PASS  emergencyTimeout · silent server: Sending…
 PASS  emergencyTimeout · after the 10 s bound: honest failure

@@ -1978,7 +1978,7 @@ function App() {
                 {/* Says only what is true at each moment: nothing about who is alerted, and
                     nothing past "Sending…" until the write has answered. */}
                 <div role="status" style={{color: holdPhase === 5 ? 'var(--danger)' : holdPhase >= 1 ? 'var(--t1)' : 'var(--t2)', fontSize:'14px',textAlign:'center',fontWeight:500,minHeight:'20px',transition:'color .2s'}}>
-                  {holdPhase === 5 ? "Couldn't reach staff. Please wave for help."
+                  {holdPhase === 5 ? "Couldn't confirm it reached staff. Please wave for help."
                     : holdPhase === 4 ? 'Sent to staff as an emergency request.'
                     : holdPhase === 3 ? 'Sending your emergency request…'
                     : holdPhase >= 1 ? 'Keep holding…'
