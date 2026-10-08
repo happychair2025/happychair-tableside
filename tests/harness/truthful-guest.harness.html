@@ -9,7 +9,11 @@ window.onerror = m => { document.getElementById('err').textContent += 'ERROR: ' 
 const P = new URLSearchParams(location.search)
 const S = P.get('s')
 const w = ms => new Promise(r => setTimeout(r, ms))
-const later = (ms, v) => new Promise(r => setTimeout(() => r(v), ms))
+// ms === Infinity models a half-open connection: the "server" never answers.
+const later = (ms, v) => new Promise(r => { if (ms !== Infinity) setTimeout(() => r(v), ms) })
+// Wall-clock skew, so a 2-minute wait can be exercised without waiting 2 minutes. Only the
+// app's Date.now() moves; real timers (and therefore polling) keep their real cadence.
+const __realNow = Date.now.bind(Date); window.__SKEW__ = 0; Date.now = () => __realNow() + window.__SKEW__
 const OK = d => ({ data: d, error: null })
 const resolveRow = [{ available: true, reason: null, table_label: 'P4', zone_name: 'Terrace', venue_name: 'Happy Bistro', service_mode: 'live' }]
 // The scripted server. Harness steps mutate SERVER to change what the RPC reports.
@@ -62,7 +66,7 @@ const NO_CLAIM = /help is on the way|manager is on the way|server is coming|aler
 
 const scenarios = {
   // Service request, permanent-code path: Sending → Sent (stays Sent with no timestamp) →
-  // On the way only when accepted_at appears → Done only when completed_at appears.
+  // Accepted only when accepted_at appears → Done only when completed_at appears.
   async request() {
     svc('Request Check').click(); await f()
     ok('shows Sending… while the write is in flight', /^Sending/.test(st('Request Check')), st('Request Check'))
@@ -77,8 +81,8 @@ const scenarios = {
     ok('still Sent after 9 s with no accepted_at (no simulated progress)', /^Sent · /.test(st('Request Check')), st('Request Check'))
     ok('nothing claims acceptance', !NO_CLAIM.test(txt()))
     SERVER.accepted_at = new Date().toISOString()
-    ok('On the way once accepted_at exists', await until(() => st('Request Check') === 'On the way', 7000), st('Request Check'))
-    await shot('03-request-on-the-way')
+    ok('Accepted once accepted_at exists', await until(() => st('Request Check') === 'Accepted', 7000), st('Request Check'))
+    await shot('03-request-accepted')
     ok('a second tap does not create a second request', (svc('Request Check').click(), await w(300), calls('guest_create_request').length === 1))
     SERVER.completed_at = new Date().toISOString()
     ok('Done once completed_at exists', await until(() => st('Request Check') === 'Done', 7000), st('Request Check'))
@@ -89,7 +93,7 @@ const scenarios = {
   async requestFail() {
     SERVER.createFails = true
     svc('Refill Water').click()
-    ok('failed write shown on that button', await until(() => /Not sent/.test(st('Refill Water'))), st('Refill Water'))
+    ok('failed write shown on that button', await until(() => /^Couldn.t confirm\. Tap to try again\.$/.test(st('Refill Water'))), st('Refill Water'))
     ok('no success toast on failure', !q('.toast'))
     ok('no state poll for a failed write', calls('guest_request_state').length === 0)
     await shot('05-request-failed')
@@ -99,16 +103,56 @@ const scenarios = {
   },
   async requestNoStateFn() {
     svc('Get Server').click()
-    ok('RPC missing (PGRST202) → stays at a plain Sent', await until(() => st('Get Server') === 'Sent — your server will see it'), st('Get Server'))
+    ok('RPC missing (PGRST202) → plain Sent', await until(() => /^Sent · /.test(st('Get Server'))), st('Get Server'))
+    // Untracked must not lock the button for the rest of the page load.
+    svc('Get Server').click(); await w(300)
+    ok('untracked: double tap inside the debounce is ignored', calls('guest_create_request').length === 1)
     const n = calls('guest_request_state').length; await w(6000)
     ok('stops asking once the function is known missing', calls('guest_request_state').length === n)
+    svc('Get Server').click()
+    ok('untracked: tap after the debounce sends again', await until(() => calls('guest_create_request').length === 2, 3000))
+    ok('untracked: re-send labelled Sent again, nothing more', await until(() => /^Sent again · /.test(st('Get Server'))), st('Get Server'))
+  },
+  // Tracked request that nobody accepts: after 2 minutes it may be sent again, honestly.
+  async requestStillWaiting() {
+    svc('Request Check').click()
+    await until(() => /^Sent · /.test(st('Request Check')))
+    svc('Request Check').click(); await w(400)
+    ok('tracked: tap ignored before the wait threshold', calls('guest_create_request').length === 1)
+    window.__SKEW__ = 121000; await w(1300)
+    ok('after 2 min without acceptance: Still waiting, no progress claimed',
+      st('Request Check') === 'Still waiting. Tap to send again.', st('Request Check'))
+    ok('elapsed time alone never shows Accepted or Done', !/Accepted|Done/.test(st('Request Check')))
+    await shot('06b-request-still-waiting')
+    svc('Request Check').click()
+    ok('still-waiting tap sends again', await until(() => calls('guest_create_request').length === 2, 3000))
+    ok('labelled Sent again', await until(() => /^Sent again · /.test(st('Request Check'))), st('Request Check'))
+    ok('both requests in the episode are polled', await until(() => calls('guest_request_state').some(c => (c.args.p_request_ids || []).length === 2), 7000))
+    SERVER.accepted_at = new Date().toISOString()
+    ok('acceptance still shows as Accepted', await until(() => st('Request Check') === 'Accepted', 7000), st('Request Check'))
   },
   async legacyRequest() {
     svc('Clear Plates').click()
-    ok('legacy: Sent — your server will see it', await until(() => st('Clear Plates') === 'Sent — your server will see it'), st('Clear Plates'))
-    await w(6000)
-    ok('legacy: never polls, never advances', calls('guest_request_state').length === 0 && st('Clear Plates') === 'Sent — your server will see it')
+    ok('legacy: plain Sent', await until(() => /^Sent · /.test(st('Clear Plates'))), st('Clear Plates'))
+    await w(3500)
+    ok('legacy: never polls, never advances', calls('guest_request_state').length === 0 && /^Sent · /.test(st('Clear Plates')))
     await shot('06-legacy-request-sent')
+    svc('Clear Plates').click()
+    ok('legacy: can send again after the debounce', await until(() => calls('requests.insert').length === 2, 3000))
+  },
+  // A never-settling write must not leave "Sending…" forever.
+  async requestTimeout() {
+    SERVER.createDelay = Infinity
+    svc('Refill Water').click(); await f()
+    ok('Sending… while the server is silent', /^Sending/.test(st('Refill Water')))
+    await w(8000)
+    ok('still Sending at 8 s (no premature failure)', /^Sending/.test(st('Refill Water')), st('Refill Water'))
+    ok('after the 10 s bound: not confirmed, retry offered', await until(() => st('Refill Water') === "Couldn't confirm. Tap to try again.", 4000), st('Refill Water'))
+    ok('no success toast on timeout', !/sent/i.test(q('.toast')?.textContent || ''))
+    await shot('05b-request-timeout')
+    SERVER.createDelay = 300
+    svc('Refill Water').click()
+    ok('retry after timeout works', await until(() => /^Sent · /.test(st('Refill Water'))), st('Refill Water'))
   },
   async emergency() {
     SERVER.createDelay = 1500
@@ -127,6 +171,34 @@ const scenarios = {
     ok('Sent only after the write confirms', await until(() => /Sent to staff as an emergency request/.test(txt()), 4000))
     ok('emergency request was written as critical', calls('guest_create_request').some(c => c.args.p_category === 'critical'))
     await shot('10-emergency-sent')
+    // A light touch after "Sent" must neither reset the result nor send again.
+    await hold(q('.hld'), 120)
+    await hold(q('.hld'), 3400)
+    ok('touch / second hold after Sent keeps the result', /Sent to staff as an emergency request/.test(txt()))
+    ok('…and does not send another emergency request', calls('guest_create_request').filter(c => c.args.p_category === 'critical').length === 1)
+    const again = all('button').find(b => b.textContent.trim() === 'Send again')
+    ok('explicit Send again control is offered', !!again)
+    again.click(); await f()
+    ok('Send again returns to the hold, sends nothing by itself',
+      /Press and Hold for Immediate Help/.test(txt()) && calls('guest_create_request').filter(c => c.args.p_category === 'critical').length === 1)
+    SERVER.createDelay = 300
+    await hold(q('.hld'), 3300)
+    ok('a second deliberate hold sends a second request',
+      await until(() => calls('guest_create_request').filter(c => c.args.p_category === 'critical').length === 2, 3000))
+    q('.close-x').click(); await f(); q('.ci').click(); await f()
+    ok('leaving and returning starts from the hold', /Press and Hold for Immediate Help/.test(txt()) && !/Sent to staff/.test(txt()))
+  },
+  async emergencyTimeout() {
+    SERVER.createDelay = Infinity
+    q('.ci').click(); await f()
+    await hold(q('.hld'), 3300)
+    ok('silent server: Sending…', /Sending your emergency request/.test(txt()))
+    ok('after the 10 s bound: honest failure', await until(() => /Couldn.t reach staff\. Please wave for help\./.test(txt()), 12000))
+    ok('no claim it was sent', !/Sent to staff/.test(txt()))
+    await shot('11b-emergency-timeout')
+    SERVER.createDelay = 300
+    await hold(q('.hld'), 3300)
+    ok('retry after timeout is possible and confirms', await until(() => /Sent to staff as an emergency request/.test(txt()), 3000))
   },
   async emergencyFail() {
     SERVER.createFails = true; SERVER.createDelay = 300
@@ -167,6 +239,11 @@ const scenarios = {
     ok('okay copy claims nothing', !NO_CLAIM.test(txt()), txt().slice(0, 300))
     ok('legacy path hides the note box', !q('.ac-ta'))
     await shot('15-sentiment-okay-legacy')
+    q('.close-x').click(); await f()
+    all('.fx').find(b => /Happy/.test(b.textContent)).click()
+    await until(() => /Glad You/.test(txt()))
+    const ins = calls('sentiment_ratings.insert').map(c => c.args).find(a => a.score === 3)
+    ok('score 3 does not record a review prompt that was never shown', ins && ins.google_review_prompted === false, JSON.stringify(ins))
   },
   async a11y() {
     ok('Urgent control is a <button> with aria-label', q('.ci')?.tagName === 'BUTTON' && !!q('.ci').getAttribute('aria-label'))

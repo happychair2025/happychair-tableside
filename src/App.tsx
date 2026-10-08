@@ -9,11 +9,35 @@ import {
   type GuestRequest,
   type ServerRequestState,
   requestStage,
-  requestStageLabel,
+  requestLabel,
   isOpen,
   blocksNewTap,
   applyServerState,
 } from './lib/requestStatus'
+
+/**
+ * Upper bound on a guest write. fetch has no default timeout and supabase-js sets none, so a
+ * half-open connection never settles — the guest would read "Sending…" forever and could not
+ * retry. Past this bound the request is aborted and reported as NOT CONFIRMED (it may or may
+ * not have landed; the guest is told only that we could not confirm it, and may retry).
+ */
+const SEND_TIMEOUT_MS = 10000
+type WriteResult = { data: unknown; error: unknown }
+async function bounded(make: (signal: AbortSignal) => PromiseLike<WriteResult>): Promise<WriteResult> {
+  const ctl = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  // The timer only aborts and reports a failure; it can never produce a success.
+  const timeout = new Promise<WriteResult>(resolve => {
+    timer = setTimeout(() => { ctl.abort(); resolve({ data: null, error: { code: 'TIMEOUT', message: 'timed out' } }) }, SEND_TIMEOUT_MS)
+  })
+  try {
+    return await Promise.race([Promise.resolve(make(ctl.signal)), timeout])
+  } catch (e) {
+    return { data: null, error: e ?? { code: 'ABORTED' } }
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
 // ══════════════════════════════════════════════════════════════
 // ALLERGEN DATABASE
@@ -607,8 +631,8 @@ function App() {
    */
   const sendRequest = async (category: string): Promise<{ ok: boolean; requestId: string | null }> => {
     if (viaCode) {
-      const { data, error } = await supabase.rpc('guest_create_request',
-        { p_code: permanentCode, p_category: category, p_custom_type: null })
+      const { data, error } = await bounded(signal => supabase.rpc('guest_create_request',
+        { p_code: permanentCode, p_category: category, p_custom_type: null }).abortSignal(signal))
       const r = data as { ok?: boolean; request_id?: string } | null
       if (error || !r?.ok) return { ok: false, requestId: null }
       return { ok: true, requestId: typeof r.request_id === 'string' ? r.request_id : null }
@@ -616,9 +640,9 @@ function App() {
     if (!resolvedVenueId || !assetId) return { ok: false, requestId: null }
     // Legacy entry: anon can insert but cannot read requests back, so no id is kept and no
     // progress is ever claimed for it.
-    const { error } = await supabase.from('requests').insert({
+    const { error } = await bounded(signal => supabase.from('requests').insert({
       venue_id: resolvedVenueId, asset_id: assetId, category, status: 'pending',
-    })
+    }).abortSignal(signal))
     return { ok: !error, requestId: null }
   }
 
@@ -826,7 +850,9 @@ function App() {
     setSubmitting(true)
     setSubmitError('')
     const payload = score === 3
-      ? { venue_id: resolvedVenueId, asset_id: assetId, score, google_review_prompted: true, manager_intervention_needed: false, notification_priority: null }
+      // google_review_prompted is false: no review prompt is shown to the guest any more, and
+      // recording one would fabricate the admin "review prompts" metric.
+      ? { venue_id: resolvedVenueId, asset_id: assetId, score, google_review_prompted: false, manager_intervention_needed: false, notification_priority: null }
       : score === 2
       ? { venue_id: resolvedVenueId, asset_id: assetId, score, google_review_prompted: false, manager_intervention_needed: false, notification_priority: 'normal' }
       : { venue_id: resolvedVenueId, asset_id: assetId, score, google_review_prompted: false, manager_intervention_needed: true, notification_priority: 'urgent' }
@@ -883,25 +909,48 @@ function App() {
 
   /**
    * A service button tap. The button says "Sending…" while the write is in flight, and only
-   * a CONFIRMED write moves it to "Sent" and shows the toast. A failed write says so on the
-   * button itself and a second tap retries. Nothing advances on a timer: "On the way" and
-   * "Done" appear only when the server reports accepted_at / completed_at (see the poll
+   * a CONFIRMED write moves it to "Sent" and shows the toast. A failed or timed-out write says
+   * so on the button itself and a second tap retries. Nothing advances on a timer: "Accepted"
+   * and "Done" appear only when the server reports accepted_at / completed_at (see the poll
    * below). The simulated accept/complete timers that used to live here are gone.
+   *
+   * Sending again. A request this client cannot track (legacy entry, or the read-only RPC not
+   * deployed) may be sent again after a short double-tap debounce — otherwise every button
+   * would be usable once per page load. A tracked request may be sent again once it has gone
+   * STILL_WAITING_MS with no acceptance. A re-send keeps the earlier ids in the episode, so an
+   * acceptance of the first request still shows; a failed re-send never retracts "Sent".
    */
   const handleSvcTap = async (idx: number) => {
-    if (blocksNewTap(btnStates[idx])) return
-    setBtnStates(p => ({...p, [idx]: {
-      phase: 'sending', requestId: null, tracked: false, acceptedAt: null, completedAt: null, at: Date.now(),
-    }}))
+    const prev = btnStates[idx]
+    if (blocksNewTap(prev, Date.now())) return
+    // Continue the episode only while an earlier send is confirmed and not finished.
+    const prevStage = prev ? requestStage(prev) : null
+    const resend = !!prev && (prevStage === 'sent' || prevStage === 'sent_untracked')
+    const base: GuestRequest = resend ? { ...prev!, resendFailed: false } : {
+      phase: 'sent', requestIds: [], tracked: false, acceptedAt: null, completedAt: null,
+      at: Date.now(), sentAt: null, sends: 0, resendFailed: false,
+    }
+    setBtnStates(p => ({...p, [idx]: { ...base, phase: 'sending' }}))
     const { ok, requestId } = await sendRequest(svcCategories[idx])
-    setBtnStates(p => ({...p, [idx]: {
-      ...p[idx],
-      phase: ok ? 'sent' : 'failed',
-      requestId,
-      // Progress is readable only on the code path, with an id, and while the RPC exists.
-      tracked: ok && viaCode && !!requestId && !requestStateUnavailable.current,
-    }}))
-    if (ok) showToast(`${svcLabels[idx]} sent`)
+    setBtnStates(p => {
+      const cur = p[idx] ?? base
+      if (!ok) {
+        // A re-send that did not confirm leaves the earlier, confirmed send standing.
+        return {...p, [idx]: resend ? { ...cur, phase: 'sent', resendFailed: true } : { ...cur, phase: 'failed' }}
+      }
+      const requestIds = requestId ? [...cur.requestIds, requestId] : cur.requestIds
+      return {...p, [idx]: {
+        ...cur,
+        phase: 'sent',
+        requestIds,
+        sentAt: Date.now(),
+        sends: cur.sends + 1,
+        resendFailed: false,
+        // Progress is readable only on the code path, with an id, and while the RPC exists.
+        tracked: viaCode && requestIds.length > 0 && !requestStateUnavailable.current,
+      }}
+    })
+    if (ok) showToast(resend ? `${svcLabels[idx]} sent again` : `${svcLabels[idx]} sent`)
   }
 
   // ── REQUEST PROGRESS POLL ──
@@ -909,7 +958,7 @@ function App() {
   // the page comes back to the foreground. Runs only while some request is still open and
   // stops by itself once every request is Done. Read-only: guest_request_state writes
   // nothing, so it cannot duplicate a request. A failed read changes nothing on screen.
-  const openRequestIds = Object.values(btnStates).filter(isOpen).map(r => r.requestId as string)
+  const openRequestIds = Object.values(btnStates).filter(isOpen).flatMap(r => r.requestIds)
   const openKey = openRequestIds.slice().sort().join(',')
   useEffect(() => {
     if (!viaCode || !openKey || requestStateUnavailable.current) return
@@ -950,10 +999,10 @@ function App() {
 
   // ── BUTTON TIMER ──
   // Re-renders the elapsed counter once a second while a request is waiting. It changes the
-  // NUMBER of seconds shown, never the status.
+  // NUMBER of seconds shown and whether a re-send is offered — never the status.
   const [, setTick] = useState(0)
   useEffect(() => {
-    const waiting = Object.values(btnStates).some(b => { const s = requestStage(b); return s === 'sent' || s === 'sending' })
+    const waiting = Object.values(btnStates).some(b => { const s = requestStage(b); return s === 'sent' || s === 'sent_untracked' || s === 'sending' })
     if (!waiting) return
     const iv = setInterval(() => setTick(t => t+1), 1000)
     return () => clearInterval(iv)
@@ -1248,7 +1297,9 @@ function App() {
    * hold completed, whether or not the request ever landed.
    */
   const startHold = () => {
-    if (urgentInFlight.current) return
+    // In flight, or already sent: a touch must not start a second emergency request. A
+    // repeat is only possible through the explicit "Send again" control below.
+    if (urgentInFlight.current || holdPhase === 4) return
     const start = Date.now()
     setHoldPhase(0)
     const tick = () => {
@@ -1273,6 +1324,9 @@ function App() {
     }
     holdRAF.current = requestAnimationFrame(tick)
   }
+
+  /** Explicit, separate choice to raise another emergency request after one was sent. */
+  const resetHoldForResend = () => { setHoldPhase(0); setHoldProgress(0) }
 
   const endHold = () => {
     if (holdRAF.current) cancelAnimationFrame(holdRAF.current)
@@ -1404,9 +1458,11 @@ function App() {
                 const bs = btnStates[i]
                 const stage = bs ? requestStage(bs) : null
                 const cls = stage === 'sending' || stage === 'sent' || stage === 'sent_untracked' ? 'sb pending'
-                  : stage === 'on_the_way' || stage === 'done' ? 'sb accepted'
+                  : stage === 'accepted' || stage === 'done' ? 'sb accepted'
                   : stage === 'failed' ? 'sb failed' : 'sb'
-                const text = stage ? requestStageLabel(stage) : ''
+                const text = bs ? requestLabel(bs, Date.now()) : ''
+                // Elapsed time is shown only beside a plain "Sent" / "Sent again".
+                const withElapsed = !!bs && (stage === 'sent' || stage === 'sent_untracked') && /^Sent( again)?$/.test(text)
                 return (
                   <button key={i} className={cls} onClick={() => handleSvcTap(i)}
                     aria-label={stage ? `${label}: ${text}` : label}>
@@ -1414,9 +1470,8 @@ function App() {
                     <span className="sb-l">{label}</span>
                     <div className="sb-st" role="status">
                       {stage === 'sending' && <><div className="spinner"/>{text}</>}
-                      {stage === 'sent' && bs && <>{`${text} · ${fmtTime(bs.at)}`}</>}
-                      {stage === 'sent_untracked' && <>{text}</>}
-                      {(stage === 'on_the_way' || stage === 'done') && <><div className="ck"><svg width="7" height="7" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="10 3 5 9 2 6"/></svg></div>{text}</>}
+                      {(stage === 'sent' || stage === 'sent_untracked') && bs && <>{withElapsed ? `${text} · ${fmtTime(bs.sentAt ?? bs.at)}` : text}</>}
+                      {(stage === 'accepted' || stage === 'done') && <><div className="ck"><svg width="7" height="7" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="10 3 5 9 2 6"/></svg></div>{text}</>}
                       {stage === 'failed' && <>{text}</>}
                     </div>
                   </button>
@@ -1911,7 +1966,7 @@ function App() {
                     onTouchStart={startHold} onTouchEnd={endHold} onTouchCancel={endHold}>
                     <div className="hld-fill" style={{width:`${holdProgress*100}%`}}/>
                     <span style={{position:'relative',zIndex:1}}>
-                      {holdPhase === 5 ? 'Not sent. Hold to try again.'
+                      {holdPhase === 5 ? "Couldn't confirm. Hold to try again."
                         : holdPhase === 4 ? 'Sent to Staff'
                         : holdPhase === 3 ? 'Sending…'
                         : holdPhase >= 1 ? 'Keep holding…'
@@ -1929,6 +1984,14 @@ function App() {
                     : holdPhase >= 1 ? 'Keep holding…'
                     : 'Hold for 3 seconds.'}
                 </div>
+                {/* The sent result stays until the guest leaves this screen. Sending another
+                    emergency request is a deliberate second choice, then a second hold. */}
+                {holdPhase === 4 && (
+                  <button type="button" className="txt-link" style={{display:'block',margin:'14px auto 0',minHeight:'44px'}}
+                    onClick={resetHoldForResend}>
+                    Send again
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -8,7 +8,7 @@
 --   No simulated progress." Tableside used to advance every service button to
 --   "Accepted · On the Way" on a random 3-7 s timer. That timer is deleted (branch
 --   w1/tableside). This function is what lets the guest see real progress instead:
---   "Sent" until accepted_at exists, "On the way" once it does, "Done" once completed_at does.
+--   "Sent" until accepted_at exists, "Accepted" once it does, "Done" once completed_at does.
 --
 -- SCOPING (mirrors guest_declaration_state, read from production 2026-10-08)
 --   * The opaque code is resolved through guest_service_point_from_code, exactly as every
