@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:staging": "HC_REQUIRE_STAGING=1 vite --host",
+    "build:staging": "HC_REQUIRE_STAGING=1 vite build",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "node tests/no-simulated-progress.test.mjs && node tests/request-status.test.mjs",
+    "test": "node tests/no-simulated-progress.test.mjs && node tests/request-status.test.mjs && node --test tests/staging-env.test.ts",
     "test:harness": "node tests/harness/run.mjs"
   },
   "dependencies": {

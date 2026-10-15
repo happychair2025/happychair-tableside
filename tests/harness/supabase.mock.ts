@@ -58,3 +58,7 @@ export const supabase = {
   ),
   from: (table: string) => builder(table),
 } as unknown as typeof import('../../src/lib/supabase').supabase
+
+// The real module also exports the staging guard's result; the harness is never staging and never refused.
+export const IS_STAGING = false
+export const ENV_PROBLEM: string | null = null
