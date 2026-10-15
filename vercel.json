@@ -3,5 +3,13 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "w1/*": false,
+      "w2/*": false,
+      "w3/*": false,
+      "w4/*": false
+    }
+  }
 }
